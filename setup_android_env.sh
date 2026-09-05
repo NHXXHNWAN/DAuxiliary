@@ -272,7 +272,7 @@ ensure_android_tools() {
   export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
   log "Installing Android SDK packages"
   yes | sdkmanager --licenses >/dev/null || true
-  sdkmanager "platform-tools" "platforms;android-37" "build-tools;35.0.0"
+  sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0"
 }
 
 ensure_gradle() {

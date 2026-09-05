@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.dauxiliary"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.dauxiliary"
