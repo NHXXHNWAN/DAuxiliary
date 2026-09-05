@@ -10,7 +10,7 @@ android {
     defaultConfig {
         applicationId = "com.dauxiliary"
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
     }
