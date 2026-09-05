@@ -24,14 +24,9 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: gradle
+      # Match Miuix's own CI: ubuntu-latest provides the Android SDK.
+      # Do not invoke sdkmanager because its package index lacks android-37.
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK platform
-        run: |
-          sdkmanager --update
-          sdkmanager "platform-tools" "platforms;android-37" "build-tools;37.0.0"
 
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
