@@ -1,0 +1,41 @@
+# Gradle and generated workspace metadata
+.gradle/
+**/.gradle/
+.kotlin/
+/build/
+**/build/
+.backup/
+.operit/
+
+# Local Android SDK configuration
+local.properties
+
+# Android Studio / IntelliJ
+*.iml
+.idea/
+*.ipr
+*.iws
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Android build and tooling output
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+
+# Local logs and generated reports
+*.log
+reports/
+
+# Local helper downloads / reverse-engineering artifacts
+/tools/
+
+# Signing material and machine-specific files
+*.jks
+*.keystore
+*.p12
+*.pem
