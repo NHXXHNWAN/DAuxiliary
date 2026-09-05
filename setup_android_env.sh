@@ -27,7 +27,7 @@ speed_to_int() {
   echo "$speed_int"
 }
 
-GRADLE_VERSION="9.1.0"
+GRADLE_VERSION="9.3.1"
 GRADLE_ROOT="${GRADLE_ROOT:-$HOME/gradle}"
 GRADLE_DIST="gradle-${GRADLE_VERSION}"
 GRADLE_ZIP="${GRADLE_ROOT}/${GRADLE_DIST}-bin.zip"
@@ -512,7 +512,7 @@ export ANDROID_HOME=$ANDROID_HOME
 export ANDROID_SDK_ROOT=$ANDROID_HOME
 export PATH=\$ANDROID_HOME/cmdline-tools/latest/bin:\$ANDROID_HOME/platform-tools:\$JAVA_HOME/bin:\$PATH
 export GRADLE_USER_HOME=$GRADLE_USER_HOME
-export GRADLE_HOME=${GRADLE_HOME:-$HOME/gradle/gradle-9.1.0}
+export GRADLE_HOME=${GRADLE_HOME:-$HOME/gradle/gradle-9.3.1}
 export PATH=\$GRADLE_HOME/bin:\$PATH
 # <<< operit android env <<<
 EOF

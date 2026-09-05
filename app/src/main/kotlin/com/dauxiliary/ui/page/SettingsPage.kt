@@ -13,19 +13,28 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.dauxiliary.core.config.ConfigStore
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 
 /**
  * Settings page: app-level preferences (theme, language, about).
  */
 @Composable
-fun SettingsPage() {
+fun SettingsPage(onFloatingNavigationBarStyleChange: (Int) -> Unit = {}) {
     val scrollBehavior = MiuixScrollBehavior()
+    val context = androidx.compose.ui.platform.LocalContext.current
     var darkModeFollowSystem by rememberSaveable { mutableStateOf(true) }
+    var floatingNavigationBarStyle by rememberSaveable {
+        mutableStateOf(
+            ConfigStore.prefs(context).getInt(ConfigStore.KEY_FLOATING_NAVIGATION_BAR_STYLE, 0),
+        )
+    }
+    val floatingNavigationBarStyles = listOf("Default", "iOS-like")
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
@@ -47,6 +56,19 @@ fun SettingsPage() {
                         summary = "关闭后可手动指定浅色/深色",
                         checked = darkModeFollowSystem,
                         onCheckedChange = { darkModeFollowSystem = it },
+                    )
+                    OverlayDropdownPreference(
+                        title = "FloatingNavigationBar 样式",
+                        summary = "Default 使用 Miuix 底栏；iOS-like 使用官方示例的液态玻璃方案",
+                        items = floatingNavigationBarStyles,
+                        selectedIndex = floatingNavigationBarStyle,
+                        onSelectedIndexChange = { style ->
+                            floatingNavigationBarStyle = style
+                            onFloatingNavigationBarStyleChange(style)
+                            ConfigStore.prefs(context).edit()
+                                .putInt(ConfigStore.KEY_FLOATING_NAVIGATION_BAR_STYLE, style)
+                                .apply()
+                        },
                     )
                 }
             }

@@ -19,6 +19,7 @@ object ConfigStore {
     private const val PREFS_FILE = "daux_config"
 
     const val KEY_MASTER_SWITCH = "master_switch"
+    const val KEY_FLOATING_NAVIGATION_BAR_STYLE = "floating_navigation_bar_style"
 
     // ---- Module UI side (write) ----
 
