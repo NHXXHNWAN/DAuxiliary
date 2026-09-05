@@ -36,7 +36,7 @@ DAuxiliary 不是一个独立的抖音客户端，也不修改或重新分发抖
 - Jetpack Compose
 - Miuix Compose UI
 - LSPosed/Xposed API（`compileOnly`，运行时由 LSPosed 提供）
-- Android SDK 37（当前 Miuix 0.9.3 的 AAR 元数据要求）
+- Android SDK 37（当前 Compose/Miuix 依赖的 AAR 元数据要求）
 
 版本以 `gradle/libs.versions.toml` 为准。Miuix API 仍可能更新，升级版本时必须先核对官方 API 和 Android 编译要求，再修改依赖。
 
