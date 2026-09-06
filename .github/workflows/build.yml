@@ -56,7 +56,12 @@ jobs:
       - name: Build Debug APK
         run: |
           set -o pipefail
-          ./gradlew :app:assembleDebug --no-daemon --console=plain --stacktrace --info 2>&1 | tee "$RUNNER_TEMP/debug-build.log"
+          ./gradlew :app:assembleDebug --no-daemon --console=plain 2>&1 | tee "$RUNNER_TEMP/debug-build.log"
+      - name: Print Kotlin diagnostics
+        if: failure()
+        run: |
+          echo '--- Kotlin compiler diagnostics ---'
+          grep -E '(^e: |\.kt:[0-9]+:[0-9]+|^error: |Compilation error)' "$RUNNER_TEMP/debug-build.log" || true
       - name: Upload Kotlin build log
         if: always()
         uses: actions/upload-artifact@v4
@@ -66,6 +71,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
       - name: Build Release APK
+        if: success()
         run: ./gradlew :app:assembleRelease --no-daemon --console=plain
 
       - name: Upload APK artifacts
