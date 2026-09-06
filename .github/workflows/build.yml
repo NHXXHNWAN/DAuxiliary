@@ -35,8 +35,11 @@ jobs:
       - name: Create temporary CI signing key
         run: |
           store_password="$(openssl rand -hex 16)"
-          key_password="$(openssl rand -hex 16)"
+          # Use one password for the keystore and its private key. This avoids
+          # JDK/AGP key decryption mismatches for temporary CI signing keys.
+          key_password="$store_password"
           keytool -genkeypair \
+            -storetype JKS \
             -alias dauxiliary-ci \
             -keyalg RSA \
             -keysize 2048 \
@@ -46,6 +49,11 @@ jobs:
             -keypass "$key_password" \
             -dname "CN=DAuxiliary CI, OU=Development, O=DAuxiliary, C=CN" \
             -noprompt
+          keytool -list \
+            -storetype JKS \
+            -keystore "$RUNNER_TEMP/dauxiliary-release.jks" \
+            -storepass "$store_password" \
+            -alias dauxiliary-ci >/dev/null
           {
             echo "RELEASE_STORE_FILE=$RUNNER_TEMP/dauxiliary-release.jks"
             echo "RELEASE_STORE_PASSWORD=$store_password"
