@@ -56,8 +56,9 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
 
-    // Miuix UI + preference components (HyperOS style)
+    // Miuix UI + blur/effect components (HyperOS style)
     implementation(libs.miuix.ui)
+    implementation(libs.miuix.blur)
     implementation(libs.miuix.preference)
     implementation(libs.miuix.icons)
 
