@@ -54,8 +54,17 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Build Debug APK
-        run: ./gradlew :app:assembleDebug --no-daemon --console=plain
-
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleDebug --no-daemon --console=plain --stacktrace --info 2>&1 | tee "$RUNNER_TEMP/debug-build.log"
+      - name: Upload Kotlin build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kotlin-build-log-${{ github.sha }}
+          path: ${{ runner.temp }}/debug-build.log
+          if-no-files-found: warn
+          retention-days: 7
       - name: Build Release APK
         run: ./gradlew :app:assembleRelease --no-daemon --console=plain
 
