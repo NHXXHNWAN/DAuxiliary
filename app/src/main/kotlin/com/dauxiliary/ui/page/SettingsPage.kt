@@ -15,17 +15,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.dauxiliary.core.config.ConfigStore
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.TopAppBar
-import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 
-/**
- * Settings page: app-level preferences (theme, language, about).
- */
+/** 设置页使用 Miuix 偏好组件，关于信息通过独立页面展示。 */
 @Composable
-fun SettingsPage(onFloatingNavigationBarStyleChange: (Int) -> Unit = {}) {
+fun SettingsPage(
+    onAboutClick: () -> Unit,
+    onFloatingNavigationBarStyleChange: (Int) -> Unit = {},
+) {
     val scrollBehavior = MiuixScrollBehavior()
     val context = androidx.compose.ui.platform.LocalContext.current
     var darkModeFollowSystem by rememberSaveable { mutableStateOf(true) }
@@ -58,8 +60,7 @@ fun SettingsPage(onFloatingNavigationBarStyleChange: (Int) -> Unit = {}) {
                         onCheckedChange = { darkModeFollowSystem = it },
                     )
                     OverlayDropdownPreference(
-                        title = "FloatingNavigationBar 样式",
-                        summary = "",
+                        title = "底栏样式",
                         items = floatingNavigationBarStyles,
                         selectedIndex = floatingNavigationBarStyle,
                         onSelectedIndexChange = { style ->
@@ -77,12 +78,10 @@ fun SettingsPage(onFloatingNavigationBarStyleChange: (Int) -> Unit = {}) {
             }
             item {
                 Card(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    SwitchPreference(
-                        title = "版本",
-                        summary = "0.1.0 (骨架)",
-                        checked = false,
-                        onCheckedChange = { },
-                        enabled = false,
+                    ArrowPreference(
+                        title = "关于 DAuxiliary",
+                        summary = "了解应用信息、开源许可与版本详情",
+                        onClick = onAboutClick,
                     )
                 }
             }
