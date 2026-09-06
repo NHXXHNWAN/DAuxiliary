@@ -40,10 +40,11 @@ import com.dauxiliary.ui.page.SettingsPage
  */
 @Composable
 fun DAuxiliaryApp() {
+    val context = LocalContext.current
     var selected by rememberSaveable { mutableIntStateOf(0) }
     var navigationBarStyle by rememberSaveable {
         mutableIntStateOf(
-            ConfigStore.prefs(LocalContext.current)
+            ConfigStore.prefs(context)
                 .getInt(ConfigStore.KEY_FLOATING_NAVIGATION_BAR_STYLE, 0),
         )
     }
