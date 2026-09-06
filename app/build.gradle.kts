@@ -87,6 +87,7 @@ dependencies {
     implementation(libs.miuix.blur)
     implementation(libs.miuix.preference)
     implementation(libs.miuix.icons)
+    implementation(libs.miuix.nav)
 
     // Xposed: compile-only, provided by LSPosed at runtime
     compileOnly(libs.xposed.api)
