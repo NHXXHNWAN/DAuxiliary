@@ -32,6 +32,27 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
+      - name: Create temporary CI signing key
+        run: |
+          store_password="$(openssl rand -hex 16)"
+          key_password="$(openssl rand -hex 16)"
+          keytool -genkeypair \
+            -alias dauxiliary-ci \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 3650 \
+            -keystore "$RUNNER_TEMP/dauxiliary-release.jks" \
+            -storepass "$store_password" \
+            -keypass "$key_password" \
+            -dname "CN=DAuxiliary CI, OU=Development, O=DAuxiliary, C=CN" \
+            -noprompt
+          {
+            echo "RELEASE_STORE_FILE=$RUNNER_TEMP/dauxiliary-release.jks"
+            echo "RELEASE_STORE_PASSWORD=$store_password"
+            echo "RELEASE_KEY_ALIAS=dauxiliary-ci"
+            echo "RELEASE_KEY_PASSWORD=$key_password"
+          } >> "$GITHUB_ENV"
+
       - name: Build Debug APK
         run: ./gradlew :app:assembleDebug --no-daemon --console=plain
 
