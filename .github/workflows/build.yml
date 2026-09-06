@@ -32,34 +32,43 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      - name: Create temporary CI signing key
+      - name: Configure release signing
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_STORE_PASSWORD_SECRET: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS_SECRET: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD_SECRET: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
-          store_password="$(openssl rand -hex 16)"
-          # Use one password for the keystore and its private key. This avoids
-          # JDK/AGP key decryption mismatches for temporary CI signing keys.
-          key_password="$store_password"
-          keytool -genkeypair \
-            -storetype JKS \
-            -alias dauxiliary-ci \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 3650 \
-            -keystore "$RUNNER_TEMP/dauxiliary-release.jks" \
-            -storepass "$store_password" \
-            -keypass "$key_password" \
-            -dname "CN=DAuxiliary CI, OU=Development, O=DAuxiliary, C=CN" \
-            -noprompt
-          keytool -list \
-            -storetype JKS \
-            -keystore "$RUNNER_TEMP/dauxiliary-release.jks" \
-            -storepass "$store_password" \
-            -alias dauxiliary-ci >/dev/null
-          {
-            echo "RELEASE_STORE_FILE=$RUNNER_TEMP/dauxiliary-release.jks"
-            echo "RELEASE_STORE_PASSWORD=$store_password"
-            echo "RELEASE_KEY_ALIAS=dauxiliary-ci"
-            echo "RELEASE_KEY_PASSWORD=$key_password"
-          } >> "$GITHUB_ENV"
+          if [ -n "$RELEASE_KEYSTORE_BASE64" ] && [ -n "$RELEASE_STORE_PASSWORD_SECRET" ] && [ -n "$RELEASE_KEY_ALIAS_SECRET" ] && [ -n "$RELEASE_KEY_PASSWORD_SECRET" ]; then
+            echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/dauxiliary-release.jks"
+            {
+              echo "RELEASE_STORE_FILE=$RUNNER_TEMP/dauxiliary-release.jks"
+              echo "RELEASE_STORE_PASSWORD=$RELEASE_STORE_PASSWORD_SECRET"
+              echo "RELEASE_KEY_ALIAS=$RELEASE_KEY_ALIAS_SECRET"
+              echo "RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD_SECRET"
+            } >> "$GITHUB_ENV"
+            echo "Using the fixed release keystore from GitHub Secrets."
+          else
+            echo "Fixed signing secrets are not configured; using a temporary test key."
+            store_password="$(openssl rand -hex 16)"
+            keytool -genkeypair \
+              -storetype JKS \
+              -alias dauxiliary-ci \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 3650 \
+              -keystore "$RUNNER_TEMP/dauxiliary-release.jks" \
+              -storepass "$store_password" \
+              -keypass "$store_password" \
+              -dname "CN=DAuxiliary CI, OU=Development, O=DAuxiliary, C=CN" \
+              -noprompt
+            {
+              echo "RELEASE_STORE_FILE=$RUNNER_TEMP/dauxiliary-release.jks"
+              echo "RELEASE_STORE_PASSWORD=$store_password"
+              echo "RELEASE_KEY_ALIAS=dauxiliary-ci"
+              echo "RELEASE_KEY_PASSWORD=$store_password"
+            } >> "$GITHUB_ENV"
+          fi
 
       - name: Build Debug APK
         run: |

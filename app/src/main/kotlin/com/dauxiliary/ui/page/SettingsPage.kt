@@ -59,7 +59,7 @@ fun SettingsPage(onFloatingNavigationBarStyleChange: (Int) -> Unit = {}) {
                     )
                     OverlayDropdownPreference(
                         title = "FloatingNavigationBar 样式",
-                        summary = "Default 使用 Miuix 底栏；iOS-like 使用官方示例的液态玻璃方案",
+                        summary = "",
                         items = floatingNavigationBarStyles,
                         selectedIndex = floatingNavigationBarStyle,
                         onSelectedIndexChange = { style ->
