@@ -34,6 +34,8 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.basic.Check
+import top.yukonga.miuix.kmp.icon.basic.Sidebar
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /** Miuix 主页面使用底栏切换，二级页面独立于底栏内容显示。 */
