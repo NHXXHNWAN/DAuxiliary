@@ -49,8 +49,8 @@ fun AboutPage(onBack: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding = PaddingValues(vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item {
                 Column(
@@ -81,7 +81,9 @@ fun AboutPage(onBack: () -> Unit) {
             item {
                 Text(
                     text = "DAuxiliary",
-                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     fontSize = 13.sp,
                 )
             }

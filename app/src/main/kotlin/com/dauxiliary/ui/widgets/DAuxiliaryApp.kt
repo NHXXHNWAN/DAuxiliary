@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,6 +33,7 @@ import top.yukonga.miuix.kmp.basic.FloatingNavigationBar
 import top.yukonga.miuix.kmp.basic.FloatingNavigationBarItem
 import top.yukonga.miuix.kmp.basic.NavigationItem
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Check
@@ -76,7 +79,15 @@ fun DAuxiliaryApp() {
                         selectedIndex = pagerState.currentPage,
                         onItemClick = { page ->
                             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                            scope.launch { pagerState.animateScrollToPage(page) }
+                            scope.launch {
+                                pagerState.animateScrollToPage(
+                                    page,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                        stiffness = Spring.StiffnessMediumLow,
+                                    ),
+                                )
+                            }
                         },
                         backdrop = contentBackdrop,
                         isBlurActive = true,
@@ -87,7 +98,15 @@ fun DAuxiliaryApp() {
                         selected = pagerState.currentPage == 0,
                         onClick = {
                             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                            scope.launch { pagerState.animateScrollToPage(0) }
+                            scope.launch {
+                                pagerState.animateScrollToPage(
+                                    0,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                        stiffness = Spring.StiffnessMediumLow,
+                                    ),
+                                )
+                            }
                         },
                         icon = MiuixIcons.Basic.Check,
                         label = "首页",
@@ -96,13 +115,20 @@ fun DAuxiliaryApp() {
                         selected = pagerState.currentPage == 1,
                         onClick = {
                             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                            scope.launch { pagerState.animateScrollToPage(1) }
+                            scope.launch {
+                                pagerState.animateScrollToPage(
+                                    1,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                        stiffness = Spring.StiffnessMediumLow,
+                                    ),
+                                )
+                            }
                         },
                         icon = MiuixIcons.Basic.Sidebar,
                         label = "设置",
                     )
                     }
-                }
                 }
             }
         },
@@ -111,7 +137,8 @@ fun DAuxiliaryApp() {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(MiuixTheme.colorScheme.background),
+                .background(MiuixTheme.colorScheme.background)
+                .layerBackdrop(contentBackdrop),
         ) {
             if (showAbout) {
                 AboutPage(onBack = { showAbout = false })

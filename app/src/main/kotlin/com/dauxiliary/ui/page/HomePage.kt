@@ -52,7 +52,7 @@ fun HomePage() {
                 SmallTitle(text = "模块状态")
             }
             item {
-                Card(modifier = Modifier.padding(horizontal = 12.dp)) {
+                Card(modifier = Modifier.padding(horizontal = 16.dp)) {
                     SwitchPreference(
                         title = "启用模块",
                         summary = "关闭后所有功能停止生效",
