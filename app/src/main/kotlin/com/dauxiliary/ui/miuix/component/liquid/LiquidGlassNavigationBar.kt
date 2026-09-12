@@ -206,7 +206,13 @@ fun IosLiquidGlassNavigationBar(
     val accentColor = MiuixTheme.colorScheme.primary
     val tabContentColor = MiuixTheme.colorScheme.onSurface
     val surfaceContainer = MiuixTheme.colorScheme.surfaceContainer
-    val containerColor = if (isBlurActive) surfaceContainer.copy(alpha = 0.4f) else surfaceContainer
+    // Keep a visible Miuix surface under the blur. A translucent black fallback makes
+    // the whole bar render black when the backdrop is unavailable during transitions.
+    val containerColor = if (isBlurActive) {
+        surfaceContainer.copy(alpha = if (isDark) 0.82f else 0.9f)
+    } else {
+        surfaceContainer
+    }
 
     val tabsBackdrop = rememberLayerBackdrop()
     val density = LocalDensity.current
@@ -409,9 +415,9 @@ fun IosLiquidGlassNavigationBar(
                             shape = pillShape,
                             shadow = Shadow(
                                 radius = 10.dp,
-                                color = Color.Black,
-                                // Lighter in light theme to avoid a visible gray fringe.
-                                alpha = if (isDark) 0.2f else 0.1f,
+color = MiuixTheme.colorScheme.onSurface,
+                                 // Subtle Miuix shadow; it must not tint the glass black.
+                                 alpha = if (isDark) 0.12f else 0.06f,
                             ),
                         )
                         .then(
@@ -528,10 +534,16 @@ fun IosLiquidGlassNavigationBar(
                                 onDrawSurface = {
                                     val progress = dampedDrag.pressProgress
                                     drawRect(
-                                        color = if (!isDark) Color.Black.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.1f),
+                                        color = if (isDark) {
+                                            Color.White.copy(alpha = 0.08f)
+                                        } else {
+                                            accentColor.copy(alpha = 0.10f)
+                                        },
                                         alpha = 1f - progress,
                                     )
-                                    drawRect(Color.Black.copy(alpha = 0.03f * progress))
+                                    drawRect(
+                                        color = accentColor.copy(alpha = 0.04f * progress),
+                                    )
                                 },
                             )
                             .innerShadow(shape = pillShape) {
