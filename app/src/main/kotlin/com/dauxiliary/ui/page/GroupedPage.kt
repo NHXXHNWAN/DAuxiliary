@@ -1,8 +1,10 @@
 package com.dauxiliary.ui.page
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -15,7 +17,10 @@ import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-/** Pages own their top insets; the main navigation host reserves bottom-bar space. */
+// The host supplies its bottom-bar inset to list content, not to the viewport.
+internal val LocalNavigationPadding = compositionLocalOf { PaddingValues() }
+
+/** Page insets and navigation insets are merged, never added twice. */
 @Composable
 internal fun GroupedPage(
     title: String,
@@ -23,20 +28,29 @@ internal fun GroupedPage(
     content: LazyListScope.() -> Unit,
 ) {
     val scrollBehavior = MiuixScrollBehavior()
+    val navigationBottom = LocalNavigationPadding.current.calculateBottomPadding()
+    val layoutDirection = LocalLayoutDirection.current
     Scaffold(
+        containerColor = MiuixTheme.colorScheme.surface,
         topBar = {
             if (navigationIcon == null) {
                 TopAppBar(title = title, scrollBehavior = scrollBehavior)
             } else {
-                SmallTopAppBar(title = title, navigationIcon = navigationIcon, scrollBehavior = scrollBehavior)
+                SmallTopAppBar(title = title, navigationIcon = navigationIcon)
             }
         },
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding)
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxSize().then(
+                if (navigationIcon == null) Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+                else Modifier,
+            ),
+            contentPadding = PaddingValues(
+                start = padding.calculateStartPadding(layoutDirection),
+                end = padding.calculateEndPadding(layoutDirection),
+                top = padding.calculateTopPadding(),
+                bottom = maxOf(navigationBottom, padding.calculateBottomPadding()) + 24.dp,
+            ),
             content = content,
         )
     }
@@ -52,13 +66,5 @@ internal fun GroupCard(content: @Composable () -> Unit) {
 /** Read-only information has no disabled arrow or fake click action. */
 @Composable
 internal fun InformationRow(title: String, summary: String) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(text = title, style = MiuixTheme.textStyles.body1,
-            color = MiuixTheme.colorScheme.onSurface)
-        Text(text = summary, style = MiuixTheme.textStyles.footnote1,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-    }
+    BasicComponent(title = title, summary = summary)
 }

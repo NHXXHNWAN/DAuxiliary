@@ -2,7 +2,8 @@ package com.dauxiliary.ui.widgets
 
 import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
+import androidx.compose.runtime.CompositionLocalProvider
+import com.dauxiliary.ui.page.LocalNavigationPadding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -54,7 +55,7 @@ fun DAuxiliaryApp() {
     var showAbout by rememberSaveable { mutableStateOf(false) }
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
     val scope = rememberCoroutineScope()
-    val surfaceColor = MiuixTheme.colorScheme.background
+    val surfaceColor = MiuixTheme.colorScheme.surface
     val contentBackdrop = rememberLayerBackdrop {
         drawRect(surfaceColor)
         drawContent()
@@ -147,12 +148,10 @@ fun DAuxiliaryApp() {
                 .fillMaxSize()
                 .layerBackdrop(contentBackdrop),
         ) {
-            if (showAbout) {
-                AboutPage(onBack = { showAbout = false })
-            } else {
+            CompositionLocalProvider(LocalNavigationPadding provides padding) {
                 HorizontalPager(
                     state = pagerState,
-                    modifier = Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding()),
+                    modifier = Modifier.fillMaxSize(),
                     userScrollEnabled = true,
                 ) { page ->
                     if (page == 0) {
