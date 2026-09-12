@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.ui.page.AboutPage
 import com.dauxiliary.ui.page.HomePage
+import com.dauxiliary.ui.miuix.component.liquid.IosLiquidGlassNavigationBar
 import com.dauxiliary.ui.page.SettingsPage
 import top.yukonga.miuix.kmp.basic.FloatingNavigationBar
 import top.yukonga.miuix.kmp.basic.FloatingNavigationBarItem
@@ -50,6 +51,7 @@ fun DAuxiliaryApp() {
     var showAbout by rememberSaveable { mutableStateOf(false) }
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
     val scope = rememberCoroutineScope()
+    val contentBackdrop = rememberLayerBackdrop()
     val navigationItems = remember {
         listOf(
             NavigationItem("首页", MiuixIcons.Basic.Check),
@@ -68,7 +70,19 @@ fun DAuxiliaryApp() {
     Scaffold(
         bottomBar = {
             if (!showAbout) {
-                FloatingNavigationBar(horizontalOutSidePadding = 16.dp) {
+                if (navigationBarStyle == 1) {
+                    IosLiquidGlassNavigationBar(
+                        items = navigationItems,
+                        selectedIndex = pagerState.currentPage,
+                        onItemClick = { page ->
+                            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                            scope.launch { pagerState.animateScrollToPage(page) }
+                        },
+                        backdrop = contentBackdrop,
+                        isBlurActive = true,
+                    )
+                } else {
+                    FloatingNavigationBar(horizontalOutSidePadding = 16.dp) {
                     FloatingNavigationBarItem(
                         selected = pagerState.currentPage == 0,
                         onClick = {
@@ -87,6 +101,8 @@ fun DAuxiliaryApp() {
                         icon = MiuixIcons.Basic.Sidebar,
                         label = "设置",
                     )
+                    }
+                }
                 }
             }
         },
