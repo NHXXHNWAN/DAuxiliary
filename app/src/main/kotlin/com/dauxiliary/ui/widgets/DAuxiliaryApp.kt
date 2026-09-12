@@ -1,13 +1,21 @@
 package com.dauxiliary.ui.widgets
 
 import android.view.HapticFeedbackConstants
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -33,12 +41,9 @@ import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
 import top.yukonga.miuix.kmp.nav.transition.NavTransitions
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-private object HomeRoute : NavKey
-private object SettingsRoute : NavKey
-private object AboutRoute : NavKey
-
-/** 使用 Miuix NavDisplay 管理页面转场和滑动返回。 */
+/** Miuix 主页面使用底栏切换，二级页面独立于底栏内容显示。 */
 @Composable
 fun DAuxiliaryApp() {
     val context = LocalContext.current
@@ -49,30 +54,25 @@ fun DAuxiliaryApp() {
                 .getInt(ConfigStore.KEY_FLOATING_NAVIGATION_BAR_STYLE, 0),
         )
     }
-    val backStack = remember { navBackStackOf(HomeRoute) }
+    var selected by rememberSaveable { mutableIntStateOf(0) }
+    var showAbout by rememberSaveable { mutableStateOf(false) }
     val contentBackdrop = rememberLayerBackdrop()
-    val isRootPage = backStack.lastOrNull() == HomeRoute || backStack.lastOrNull() == SettingsRoute
-    val selected = if (backStack.lastOrNull() == SettingsRoute) 1 else 0
     val navigationItems = listOf(
         NavigationItem("首页", MiuixIcons.Basic.Check),
         NavigationItem("设置", MiuixIcons.Basic.Sidebar),
     )
 
     fun selectPage(page: Int) {
-        val route = if (page == 1) SettingsRoute else HomeRoute
-        if (backStack.lastOrNull() == route) return
-        val existingIndex = backStack.indexOf(route)
-        if (existingIndex >= 0) {
-            while (backStack.lastIndex > existingIndex) backStack.removeAt(backStack.lastIndex)
-        } else {
-            backStack.add(route)
-        }
+        if (selected == page || showAbout) return
+        selected = page
         view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
     }
 
+    BackHandler(enabled = showAbout) { showAbout = false }
+
     Scaffold(
         bottomBar = {
-            if (isRootPage) {
+            if (!showAbout) {
                 if (navigationBarStyle == 1) {
                     IosLiquidGlassNavigationBar(
                         items = navigationItems,
@@ -104,29 +104,36 @@ fun DAuxiliaryApp() {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .background(MiuixTheme.colorScheme.background)
                 .layerBackdrop(contentBackdrop),
         ) {
-            NavDisplay(
-                backStack = backStack,
-                modifier = Modifier.fillMaxSize(),
-                onBack = {
-                    if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
-                },
-                transition = NavTransitions.MiuixDefault,
-            ) {
-                entry<HomeRoute> { HomePage() }
-                entry<SettingsRoute>(swipeDismiss = NavSwipeDirection.LeftToRight) {
-                    SettingsPage(
-                        onAboutClick = { backStack.add(AboutRoute) },
-                        onFloatingNavigationBarStyleChange = { navigationBarStyle = it },
-                    )
-                }
-                entry<AboutRoute>(swipeDismiss = NavSwipeDirection.LeftToRight) {
-                    AboutPage(onBack = {
-                        if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
-                    })
+            if (showAbout) {
+                AboutPage(onBack = { showAbout = false })
+            } else {
+                AnimatedContent(
+                    targetState = selected,
+                    modifier = Modifier.fillMaxSize(),
+                    transitionSpec = {
+                        if (targetState > initialState) {
+                            slideInHorizontally { it } + fadeIn() togetherWith
+                                slideOutHorizontally { -it / 3 } + fadeOut()
+                        } else {
+                            slideInHorizontally { -it } + fadeIn() togetherWith
+                                slideOutHorizontally { it / 3 } + fadeOut()
+                        }
+                    },
+                    label = "mainTabTransition",
+                ) { page ->
+                    if (page == 0) {
+                        HomePage()
+                    } else {
+                        SettingsPage(
+                            onAboutClick = { showAbout = true },
+                            onFloatingNavigationBarStyleChange = { navigationBarStyle = it },
+                        )
+                    }
                 }
             }
         }
-    }
+    )
 }
