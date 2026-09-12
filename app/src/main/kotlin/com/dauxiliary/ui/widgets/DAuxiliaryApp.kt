@@ -1,10 +1,6 @@
 package com.dauxiliary.ui.widgets
 
 import android.view.HapticFeedbackConstants
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -12,6 +8,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -31,16 +31,9 @@ import top.yukonga.miuix.kmp.basic.FloatingNavigationBar
 import top.yukonga.miuix.kmp.basic.FloatingNavigationBarItem
 import top.yukonga.miuix.kmp.basic.NavigationItem
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.basic.Check
-import top.yukonga.miuix.kmp.icon.basic.Sidebar
-import top.yukonga.miuix.kmp.nav.core.NavDisplay
-import top.yukonga.miuix.kmp.nav.core.NavKey
-import top.yukonga.miuix.kmp.nav.core.navBackStackOf
-import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
-import top.yukonga.miuix.kmp.nav.transition.NavTransitions
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /** Miuix 主页面使用底栏切换，二级页面独立于底栏内容显示。 */
@@ -68,7 +61,9 @@ fun DAuxiliaryApp() {
         view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
     }
 
-    BackHandler(enabled = showAbout) { showAbout = false }
+    BackHandler(enabled = showAbout) {
+        showAbout = false
+    }
 
     Scaffold(
         bottomBar = {
@@ -135,5 +130,5 @@ fun DAuxiliaryApp() {
                 }
             }
         }
-    )
+    }
 }
