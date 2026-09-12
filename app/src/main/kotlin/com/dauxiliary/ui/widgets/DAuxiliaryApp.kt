@@ -54,7 +54,11 @@ fun DAuxiliaryApp() {
     var showAbout by rememberSaveable { mutableStateOf(false) }
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
     val scope = rememberCoroutineScope()
-    val contentBackdrop = rememberLayerBackdrop()
+    val surfaceColor = MiuixTheme.colorScheme.surface
+    val contentBackdrop = rememberLayerBackdrop {
+        drawRect(surfaceColor)
+        drawContent()
+    }
     val navigationItems = remember {
         listOf(
             NavigationItem("首页", MiuixIcons.Basic.Check),
@@ -136,8 +140,6 @@ fun DAuxiliaryApp() {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .background(MiuixTheme.colorScheme.background)
                 .layerBackdrop(contentBackdrop),
         ) {
             if (showAbout) {
@@ -145,7 +147,7 @@ fun DAuxiliaryApp() {
             } else {
                 HorizontalPager(
                     state = pagerState,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().padding(padding),
                     userScrollEnabled = true,
                 ) { page ->
                     if (page == 0) {

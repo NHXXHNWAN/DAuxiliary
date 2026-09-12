@@ -64,7 +64,8 @@ fun SettingsPage(
                 Card(modifier = Modifier.padding(horizontal = 16.dp)) {
                     SwitchPreference(
                         title = "跟随系统深色模式",
-                        summary = "关闭后可手动指定浅色/深色",
+                        summary = "界面颜色跟随系统设置",
+                        enabled = false,
                         checked = darkModeFollowSystem,
                         onCheckedChange = { darkModeFollowSystem = it },
                     )
