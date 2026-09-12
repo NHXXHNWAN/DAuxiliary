@@ -54,7 +54,7 @@ fun DAuxiliaryApp() {
     var showAbout by rememberSaveable { mutableStateOf(false) }
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
     val scope = rememberCoroutineScope()
-    val surfaceColor = MiuixTheme.colorScheme.surface
+    val surfaceColor = MiuixTheme.colorScheme.background
     val contentBackdrop = rememberLayerBackdrop {
         drawRect(surfaceColor)
         drawContent()
@@ -72,6 +72,11 @@ fun DAuxiliaryApp() {
 
     BackHandler(enabled = showAbout) {
         showAbout = false
+    }
+
+    if (showAbout) {
+        AboutPage(onBack = { showAbout = false })
+        return
     }
 
     Scaffold(
@@ -147,7 +152,7 @@ fun DAuxiliaryApp() {
             } else {
                 HorizontalPager(
                     state = pagerState,
-                    modifier = Modifier.fillMaxSize().padding(padding),
+                    modifier = Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding()),
                     userScrollEnabled = true,
                 ) { page ->
                     if (page == 0) {
@@ -155,7 +160,12 @@ fun DAuxiliaryApp() {
                     } else {
                         SettingsPage(
                             onAboutClick = { showAbout = true },
-                            onFloatingNavigationBarStyleChange = { navigationBarStyle = it },
+                            floatingNavigationBarStyle = navigationBarStyle,
+                            onFloatingNavigationBarStyleChange = {
+                                navigationBarStyle = it
+                                ConfigStore.prefs(context).edit()
+                                    .putInt(ConfigStore.KEY_FLOATING_NAVIGATION_BAR_STYLE, it).apply()
+                            },
                         )
                     }
                 }

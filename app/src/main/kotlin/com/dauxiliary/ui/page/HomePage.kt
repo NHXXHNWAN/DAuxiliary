@@ -1,68 +1,41 @@
 package com.dauxiliary.ui.page
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import com.dauxiliary.core.config.ConfigStore
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.SmallTitle
-import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.preference.SwitchPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-/** 首页只保留模块总开关，具体功能从后续版本逐步接入。 */
 @Composable
 fun HomePage() {
-    val scrollBehavior = MiuixScrollBehavior()
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     var moduleEnabled by rememberSaveable { mutableStateOf(ConfigStore.isMasterEnabled(context)) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MiuixTheme.colorScheme.background),
-    ) {
-        TopAppBar(
-            title = "DAuxiliary",
-            largeTitle = "DAuxiliary",
-            subtitle = "抖音增强模块",
-            scrollBehavior = scrollBehavior,
-        )
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding = PaddingValues(vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            item {
-                SmallTitle(text = "模块状态")
+    GroupedPage(title = "DAuxiliary") {
+        item { SmallTitle(text = "模块状态") }
+        item {
+            GroupCard {
+                InformationRow("运行状态待确认", "请在 LSPosed 中启用模块并勾选抖音作用域。当前页面尚未接入宿主运行状态回报。")
             }
-            item {
-                Card(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    SwitchPreference(
-                        title = "启用模块",
-                        summary = "关闭后所有功能停止生效",
-                        checked = moduleEnabled,
-                        onCheckedChange = {
-                            moduleEnabled = it
-                            ConfigStore.setMasterSwitch(context, it)
-                        },
-                    )
-                }
+        }
+        item { SmallTitle(text = "模块控制") }
+        item {
+            GroupCard {
+                SwitchPreference(
+                    title = "启用模块",
+                    summary = if (moduleEnabled) "总开关已开启，不代表模块已加载" else "总开关已关闭",
+                    checked = moduleEnabled,
+                    onCheckedChange = {
+                        moduleEnabled = it
+                        ConfigStore.setMasterSwitch(context, it)
+                    },
+                )
+            }
+        }
+        item { SmallTitle(text = "使用说明") }
+        item {
+            GroupCard {
+                InformationRow("首次启用", "安装后在 LSPosed 中启用 DAuxiliary，确认作用域，再重新启动抖音。")
             }
         }
     }
