@@ -23,7 +23,7 @@ internal val LocalNavigationPadding = compositionLocalOf { PaddingValues() }
 
 /** Page insets and navigation insets are merged, never added twice. */
 @Composable
-internal fun GroupedPage(
+fun GroupedPage(
     title: String,
     navigationIcon: (@Composable () -> Unit)? = null,
     content: LazyListScope.() -> Unit,

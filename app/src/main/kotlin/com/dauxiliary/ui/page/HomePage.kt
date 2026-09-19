@@ -16,12 +16,12 @@ fun HomePage() {
     val context = LocalContext.current
     var moduleEnabled by rememberSaveable { mutableStateOf(ConfigStore.isMasterEnabled(context)) }
     val enabledApps = ConfigStore.enabledApplicationPackages(context)
-    val enabledFeatures = ConfigStore.enabledFeatureCount(context)
+
     GroupedPage(title = "DAuxiliary") {
         item(key = "module_header") { SmallTitle(text = "模块") }
         item(key = "module_controls") {
             GroupCard {
-                EnabledAppsCard(enabledApps, enabledFeatures)
+                EnabledAppsCard(enabledApps)
                 // A saved preference is not evidence that LSPosed loaded the module.
                 BasicComponent(
                     title = "运行状态 · 尚未验证",

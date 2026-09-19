@@ -18,7 +18,6 @@ fun ManagePage() {
     var enabledApps by rememberSaveable {
         mutableStateOf(ConfigStore.enabledApplicationPackages(context))
     }
-    val enabledFeatures = ConfigStore.enabledFeatureCount(context)
     GroupedPage(title = "管理") {
         item { SmallTitle(text = "宿主应用") }
         item {
@@ -47,7 +46,7 @@ fun ManagePage() {
         item { SmallTitle(text = "功能") }
         item {
             GroupCard {
-                EnabledAppsCard(enabledApps, enabledFeatures)
+                EnabledAppsCard(enabledApps)
             }
         }
     }

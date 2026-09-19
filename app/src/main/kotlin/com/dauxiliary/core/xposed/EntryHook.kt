@@ -21,9 +21,9 @@ class EntryHook : IXposedHookLoadPackage {
 
         log("Loaded into ${target.displayName} (${lpparam.packageName}, pid=${android.os.Process.myPid()})")
 
-        // Host integrations are selected through the central registry. The shared
-        // in-app panel is intentionally small until host-specific features land.
-        DouyinEntryHook.install(target)
+        // Host integrations are selected through the central registry. The injected
+        // settings shell is shared while feature implementations remain host-aware.
+        HostEntryHook.install(target)
 
         if (!ConfigStore.readFromHookedProcess(ConfigStore.KEY_MASTER_SWITCH, false)) {
             log("Module switch is disabled; feature hooks are skipped")
@@ -34,7 +34,7 @@ class EntryHook : IXposedHookLoadPackage {
             return
         }
 
-        // TODO: 在这里注册实际的抖音功能 Hook；配置入口与 Hook 分发必须保持独立。
+        // TODO: 在这里注册各宿主的真实功能 Hook；配置入口与 Hook 分发保持独立。
         // FeatureRegistry.dispatch(lpparam)
     }
     companion object {

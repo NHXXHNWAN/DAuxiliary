@@ -1,10 +1,11 @@
 package com.dauxiliary.core.config
 
 import android.content.Context
+import com.dauxiliary.core.registry.AppTarget
 import de.robv.android.xposed.XSharedPreferences
 
 /**
- * Bridge between the module UI process and the hooked Douyin process.
+ * Bridge between the module UI process and all hooked host processes.
  *
  * Reading strategy:
  * 1. In the module app: plain SharedPreferences backed by MODE_WORLD_READABLE
@@ -22,7 +23,7 @@ object ConfigStore {
     const val KEY_FLOATING_NAVIGATION_BAR_STYLE = "floating_navigation_bar_style"
     const val KEY_COLOR_MODE = "color_mode"
     const val KEY_ENABLED_APPLICATIONS = "enabled_applications"
-    const val KEY_ENABLED_FEATURES = "enabled_features"
+    private const val KEY_HOST_FEATURE_PREFIX = "enabled_features_"
 
     private val DEFAULT_ENABLED_APPLICATIONS = setOf("com.ss.android.ugc.aweme")
 
@@ -35,14 +36,35 @@ object ConfigStore {
     fun enabledApplicationCount(context: Context): Int =
         enabledApplicationPackages(context).size
 
-    /** Number of enabled feature registrations, reserved for the feature registry. */
-    fun enabledFeatureCount(context: Context): Int =
-        prefs(context).getStringSet(KEY_ENABLED_FEATURES, emptySet())?.size ?: 0
+    fun enabledFeatureIds(context: Context, host: AppTarget): Set<String> =
+        if (context.packageName == MODULE_PACKAGE) {
+            prefs(context).getStringSet(KEY_HOST_FEATURE_PREFIX + host.name.lowercase(), emptySet()).orEmpty()
+        } else {
+            hookedPreferences()
+                ?.getStringSet(KEY_HOST_FEATURE_PREFIX + host.name.lowercase(), emptySet())
+                .orEmpty()
+        }
+
+    fun setFeatureEnabled(
+        context: Context,
+        host: AppTarget,
+        featureId: String,
+        enabled: Boolean,
+    ) {
+        val key = KEY_HOST_FEATURE_PREFIX + host.name.lowercase()
+        val current = enabledFeatureIds(context, host).toMutableSet()
+        if (enabled) current += featureId else current -= featureId
+        prefs(context).edit().putStringSet(key, current).apply()
+    }
 
     // ---- Module UI side (write) ----
 
+    fun moduleContext(context: Context): Context =
+        context.createPackageContext(MODULE_PACKAGE, Context.CONTEXT_IGNORE_SECURITY)
+
     fun prefs(context: Context) =
-        context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
+        context.createPackageContext(MODULE_PACKAGE, Context.CONTEXT_IGNORE_SECURITY)
+            .getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
 
     fun setMasterSwitch(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_MASTER_SWITCH, enabled).apply()
@@ -74,9 +96,6 @@ object ConfigStore {
     fun readFromHookedProcess(key: String, default: Boolean): Boolean {
         return hookedPreferences()?.getBoolean(key, default) ?: default
     }
-
-    fun readEnabledFeatureCount(): Int =
-        hookedPreferences()?.getStringSet(KEY_ENABLED_FEATURES, emptySet())?.size ?: 0
 
     fun readEnabledApplicationCount(): Int =
         hookedPreferences()?.getStringSet(KEY_ENABLED_APPLICATIONS, emptySet())?.size ?: 0

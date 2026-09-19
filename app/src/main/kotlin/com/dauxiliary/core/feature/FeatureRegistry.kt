@@ -1,0 +1,77 @@
+package com.dauxiliary.core.feature
+
+import android.content.Context
+import com.dauxiliary.core.config.ConfigStore
+import com.dauxiliary.core.registry.AppTarget
+
+/** Central feature catalogue shared by all injected hosts. */
+object FeatureRegistry {
+    private val allFeatures = listOf(
+        FeatureDefinition(
+            id = "home.module_settings",
+            title = "模块设置入口",
+            summary = "在宿主应用内显示轻量模块设置入口。",
+            category = FeatureCategory.HOME,
+            hosts = AppTarget.entries.toSet(),
+            implemented = true,
+        ),
+        FeatureDefinition(
+            id = "privacy.hide_online_status",
+            title = "隐私状态增强",
+            summary = "功能开关已预留，具体宿主 Hook 将在后续版本接入。",
+            category = FeatureCategory.PRIVACY,
+            hosts = AppTarget.entries.toSet(),
+        ),
+        FeatureDefinition(
+            id = "beautify.clean_home",
+            title = "主页界面整理",
+            summary = "按宿主应用提供界面整理与入口优化。",
+            category = FeatureCategory.BEAUTIFY,
+            hosts = AppTarget.entries.toSet(),
+        ),
+        FeatureDefinition(
+            id = "debug.verbose_log",
+            title = "详细日志",
+            summary = "记录模块加载、宿主识别和功能状态变化。",
+            category = FeatureCategory.DEBUG,
+            hosts = AppTarget.entries.toSet(),
+        ),
+        FeatureDefinition(
+            id = "wechat.chat_tools",
+            title = "微信聊天辅助",
+            summary = "微信专属功能占位，等待对应 Hook 实现。",
+            category = FeatureCategory.CHAT,
+            hosts = setOf(AppTarget.WECHAT),
+        ),
+        FeatureDefinition(
+            id = "douyin.content_tools",
+            title = "抖音内容辅助",
+            summary = "抖音专属功能占位，等待对应 Hook 实现。",
+            category = FeatureCategory.HOME,
+            hosts = setOf(AppTarget.DOUYIN),
+        ),
+        FeatureDefinition(
+            id = "qq.chat_tools",
+            title = "QQ 聊天辅助",
+            summary = "QQ 专属功能占位，等待对应 Hook 实现。",
+            category = FeatureCategory.CHAT,
+            hosts = setOf(AppTarget.QQ),
+        ),
+    )
+
+    fun featuresFor(host: AppTarget): List<FeatureDefinition> =
+        allFeatures.filter { host in it.hosts }
+
+    fun categoriesFor(host: AppTarget): List<FeatureCategory> =
+        featuresFor(host).map { it.category }.distinct()
+
+    fun isEnabled(context: Context, host: AppTarget, feature: FeatureDefinition): Boolean =
+        ConfigStore.enabledFeatureIds(context, host).contains(feature.id)
+
+    fun enabledCount(context: Context, host: AppTarget): Int =
+        featuresFor(host).count { it.implemented && isEnabled(context, host, it) }
+
+    fun setEnabled(context: Context, host: AppTarget, feature: FeatureDefinition, enabled: Boolean) {
+        ConfigStore.setFeatureEnabled(context, host, feature.id, enabled)
+    }
+}
