@@ -15,6 +15,9 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.unit.dp
 import com.dauxiliary.core.config.ConfigStore
+import com.dauxiliary.core.registry.AppTarget
+import java.util.Locale
+
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedHelpers
 import top.yukonga.miuix.kmp.basic.Button
@@ -28,33 +31,36 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 
 /**
- * 抖音进程内的模块入口。
+ * Host process module entry.
  *
- * 入口只挂载到抖音 Activity 的 decorView，不启动独立 Activity；这样用户可以
- * 在抖音内部直接打开模块面板。真正的功能 Hook 仍由 EntryHook/各 feature 负责。
+ * The shared panel is attached to the host Activity decorView instead of starting
+ * another Activity. Host-specific hooks remain owned by the feature registry.
  */
 object DouyinEntryHook {
-    private const val OVERLAY_TAG = "dauxiliary_douyin_entry"
+    private const val OVERLAY_TAG_PREFIX = "dauxiliary_host_entry_"
+    private val installedTargets = mutableSetOf<AppTarget>()
 
-    fun install() {
+    fun install(target: AppTarget) {
+        if (!installedTargets.add(target)) return
         XposedHelpers.findAndHookMethod(
             Activity::class.java,
             "onResume",
             object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     val activity = param.thisObject as? Activity ?: return
-                    installOverlay(activity)
+                    installOverlay(activity, target)
                 }
             },
         )
     }
 
-    private fun installOverlay(activity: Activity) {
+    private fun installOverlay(activity: Activity, target: AppTarget) {
         val decor = activity.window?.decorView as? ViewGroup ?: return
-        if (decor.findViewWithTag<View>(OVERLAY_TAG) != null) return
+        val overlayTag = OVERLAY_TAG_PREFIX + target.name.lowercase(Locale.ROOT)
+        if (decor.findViewWithTag<View>(overlayTag) != null) return
 
         val composeView = ComposeView(activity).apply {
-            tag = OVERLAY_TAG
+            tag = overlayTag
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             setContent {
                 MiuixTheme {
@@ -67,6 +73,7 @@ object DouyinEntryHook {
                             ),
                         )
                     }
+                    val enabledFeatures = ConfigStore.readEnabledFeatureCount()
                     Column(
                         modifier = Modifier.padding(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -77,8 +84,8 @@ object DouyinEntryHook {
                         if (expanded) {
                             Card {
                                 SwitchPreference(
-                                    title = "抖音增强模块",
-                                    summary = "在抖音内直接控制模块开关",
+                                    title = "${target.displayName}增强模块",
+                                    summary = "在宿主应用内直接控制模块开关 · 已启动 ${enabledFeatures} 个功能",
                                     checked = enabled,
                                     onCheckedChange = {
                                         enabled = it

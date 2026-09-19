@@ -2,21 +2,25 @@ package com.dauxiliary.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.theme.darkColorScheme
-import top.yukonga.miuix.kmp.theme.lightColorScheme
+import top.yukonga.miuix.kmp.theme.ThemeController
 
-/**
- * App-wide theme wrapper. Follows system light/dark mode with Miuix color schemes.
- * TODO: expose Monet dynamic colors (MiuixTheme(controller = ...)) in settings page later.
- */
+/** App theme backed by Miuix Color Mode and Android Monet. */
 @Composable
 fun AppTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    mode: ColorSchemeMode = ColorSchemeMode.System,
     content: @Composable () -> Unit,
 ) {
-    val colors = if (darkTheme) darkColorScheme() else lightColorScheme()
-    MiuixTheme(colors = colors) {
-        content()
-    }
+    val controller = remember(mode) { ThemeController(mode) }
+    MiuixTheme(controller = controller, content = content)
+}
+
+/** Resolve explicit light/dark modes for the upstream liquid-glass effects. */
+@Composable
+internal fun isAppInDarkTheme(): Boolean = when (MiuixTheme.colorSchemeMode) {
+    ColorSchemeMode.Light, ColorSchemeMode.MonetLight -> false
+    ColorSchemeMode.Dark, ColorSchemeMode.MonetDark -> true
+    else -> isSystemInDarkTheme()
 }

@@ -21,8 +21,9 @@ fun AboutPage(onBack: () -> Unit) {
         item { SmallTitle(text = "应用") }
         item {
             GroupCard {
-                InformationRow("DAuxiliary", "基于 LSPosed 的抖音增强模块")
+                InformationRow("DAuxiliary", "面向多个 Android 应用的 LSPosed 增强框架")
                 InformationRow("版本", "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+                InformationRow("作者", "NHXXHNWAN")
             }
         }
         item { SmallTitle(text = "开源信息") }
@@ -30,7 +31,8 @@ fun AboutPage(onBack: () -> Unit) {
             GroupCard {
                 InformationRow("项目许可", "Apache-2.0")
                 InformationRow("界面组件", "Miuix · Compose Multiplatform")
-                InformationRow("液态玻璃底栏", "基于 Miuix 官方示例适配，来源记录见项目 MIUIX_UPSTREAM.md。")
+                // Navigation style is configured from Settings.
+
             }
         }
     }

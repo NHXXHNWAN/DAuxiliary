@@ -8,6 +8,8 @@ import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 @Composable
 fun SettingsPage(
     onAboutClick: () -> Unit,
+    colorMode: Int,
+    onColorModeChange: (Int) -> Unit,
     floatingNavigationBarStyle: Int,
     onFloatingNavigationBarStyleChange: (Int) -> Unit,
 ) {
@@ -15,7 +17,12 @@ fun SettingsPage(
         item { SmallTitle(text = "外观") }
         item {
             GroupCard {
-                InformationRow("主题", "跟随系统切换浅色与深色外观")
+                OverlayDropdownPreference(
+                    title = "Color Mode",
+                    items = listOf("System", "Light", "Dark", "MonetSystem", "MonetLight", "MonetDark"),
+                    selectedIndex = colorMode.coerceIn(0, 5),
+                    onSelectedIndexChange = onColorModeChange,
+                )
                 OverlayDropdownPreference(
                     title = "底栏样式",
                     items = listOf("Default", "iOS-like"),

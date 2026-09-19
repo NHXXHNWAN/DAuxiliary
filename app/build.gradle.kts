@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -95,6 +96,8 @@ dependencies {
     implementation(libs.miuix.preference)
     implementation(libs.miuix.icons)
     implementation(libs.miuix.nav)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.miuix.navigationevent)
 
     // Xposed: compile-only, provided by LSPosed at runtime
     compileOnly(libs.xposed.api)

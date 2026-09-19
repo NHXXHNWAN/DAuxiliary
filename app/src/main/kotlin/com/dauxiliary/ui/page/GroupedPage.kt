@@ -16,6 +16,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.utils.overScrollVertical
 
 // The host supplies its bottom-bar inset to list content, not to the viewport.
 internal val LocalNavigationPadding = compositionLocalOf { PaddingValues() }
@@ -41,10 +42,16 @@ internal fun GroupedPage(
         },
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().then(
-                if (navigationIcon == null) Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
-                else Modifier,
-            ),
+            // Official order: boundary bounce wraps the app-bar scroll connection.
+            // Explicit modifier also supports pages shorter than the viewport.
+            modifier = Modifier
+                .fillMaxSize()
+                .overScrollVertical()
+                .then(
+                    if (navigationIcon == null) Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+                    else Modifier,
+                ),
+            overscrollEffect = null, // Never stack the theme factory with the modifier.
             contentPadding = PaddingValues(
                 start = padding.calculateStartPadding(layoutDirection),
                 end = padding.calculateEndPadding(layoutDirection),

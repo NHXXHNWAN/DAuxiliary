@@ -15,10 +15,13 @@ import top.yukonga.miuix.kmp.preference.SwitchPreference
 fun HomePage() {
     val context = LocalContext.current
     var moduleEnabled by rememberSaveable { mutableStateOf(ConfigStore.isMasterEnabled(context)) }
+    val enabledApps = ConfigStore.enabledApplicationPackages(context)
+    val enabledFeatures = ConfigStore.enabledFeatureCount(context)
     GroupedPage(title = "DAuxiliary") {
         item(key = "module_header") { SmallTitle(text = "模块") }
         item(key = "module_controls") {
             GroupCard {
+                EnabledAppsCard(enabledApps, enabledFeatures)
                 // A saved preference is not evidence that LSPosed loaded the module.
                 BasicComponent(
                     title = "运行状态 · 尚未验证",
@@ -26,7 +29,7 @@ fun HomePage() {
                 )
                 SwitchPreference(
                     title = "功能总开关",
-                    summary = if (moduleEnabled) "已开启 · 实际生效需模块正确加载" else "已关闭 · 开启前请完成下方配置",
+                    summary = if (moduleEnabled) "已开启 · 实际生效需模块正确加载" else "已关闭",
                     checked = moduleEnabled,
                     onCheckedChange = {
                         moduleEnabled = it
@@ -35,22 +38,11 @@ fun HomePage() {
                 )
             }
         }
-        item(key = "setup_header") { SmallTitle(text = "首次使用") }
-        item(key = "setup_steps") {
-            GroupCard {
-                BasicComponent(
-                    title = "1. 启用模块",
-                    summary = "在 LSPosed 管理器中启用 DAuxiliary。",
-                )
-                BasicComponent(
-                    title = "2. 配置作用域",
-                    summary = "勾选抖音（com.ss.android.ugc.aweme）。",
-                )
-                BasicComponent(
-                    title = "3. 重新启动抖音",
-                    summary = "开启功能总开关后，完全结束抖音进程并重新打开。",
-                )
-            }
+        item(key = "module_note") {
+            BasicComponent(
+                title = "状态以 LSPosed 加载结果为准",
+                summary = "开关仅保存模块配置，不代表宿主进程已经加载。",
+            )
         }
     }
 }

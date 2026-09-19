@@ -2,5 +2,7 @@
 <resources>
     <string-array name="xposed_scope">
         <item>com.ss.android.ugc.aweme</item>
+        <item>com.tencent.mm</item>
+        <item>com.tencent.mobileqq</item>
     </string-array>
 </resources>
