@@ -43,6 +43,7 @@ fun GroupedPage(
     val layoutDirection = LocalLayoutDirection.current
     val listState = rememberLazyListState()
     val surface = MiuixTheme.colorScheme.surface
+    val shaderSupported = remember { isRuntimeShaderSupported() }
     val pageBackdrop = rememberLayerBackdrop { drawRect(surface); drawContent() }
     val collapsed by remember {
         derivedStateOf {
@@ -55,7 +56,7 @@ fun GroupedPage(
         topBar = {
             Box(
                 Modifier.then(
-                    if (collapsed) Modifier.textureBlur(
+                    if (shaderSupported && collapsed) Modifier.textureBlur(
                         backdrop = pageBackdrop,
                         shape = RectangleShape,
                         blurRadius = 25f,
@@ -68,13 +69,13 @@ fun GroupedPage(
                 if (navigationIcon == null) {
                     TopAppBar(
                         title = title,
-                        color = if (collapsed) surface.copy(alpha = 0.8f) else Color.Transparent,
+                        color = if (collapsed && !shaderSupported) surface else Color.Transparent,
                         scrollBehavior = scrollBehavior,
                     )
                 } else {
                     SmallTopAppBar(
                         title = title,
-                        color = if (collapsed) surface.copy(alpha = 0.8f) else Color.Transparent,
+                        color = if (collapsed && !shaderSupported) surface else Color.Transparent,
                         navigationIcon = navigationIcon,
                     )
                 }
