@@ -69,7 +69,7 @@ fun GroupedPage(
                 SmallTopAppBar(
                     title = title,
                     titleColor = MiuixTheme.colorScheme.onSurface,
-                    color = if (collapsed && !shaderSupported) surface else Color.Transparent,
+                    color = surface.copy(alpha = if (collapsed) 0.84f else 0.68f),
                     navigationIcon = navigationIcon ?: {},
                     scrollBehavior = scrollBehavior,
                 )

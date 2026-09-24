@@ -31,8 +31,14 @@ fun SettingsPage(
                     selectedIndex = floatingNavigationBarStyle.coerceIn(0, 1),
                     onSelectedIndexChange = onFloatingNavigationBarStyleChange,
                 )
+            }
+        }
+        item { SmallTitle(text = "更新") }
+        item {
+            GroupCard {
                 OverlayDropdownPreference(
                     title = "更新通道",
+                    summary = "选择稳定版 Release 或 Test 分支测试版",
                     items = listOf("稳定版（Release）", "测试版（Test）"),
                     selectedIndex = updateChannel.coerceIn(0, 1),
                     onSelectedIndexChange = onUpdateChannelChange,
