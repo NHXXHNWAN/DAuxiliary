@@ -89,8 +89,10 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # A push to Test publishes the generated timestamp version automatically.
+      # Pull requests only build an artifact and never publish a Release.
       - name: Publish GitHub Release
-        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/Test')
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_NOTES: ${{ inputs.release_notes }}

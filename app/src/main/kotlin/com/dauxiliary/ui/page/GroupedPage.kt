@@ -1,21 +1,29 @@
 package com.dauxiliary.ui.page
 
-import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.*
+import top.yukonga.miuix.kmp.blur.*
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 
@@ -33,37 +41,70 @@ fun GroupedPage(
     val scrollBehavior = MiuixScrollBehavior()
     val navigationBottom = LocalNavigationPadding.current.calculateBottomPadding()
     val layoutDirection = LocalLayoutDirection.current
+    val listState = rememberLazyListState()
+    val surface = MiuixTheme.colorScheme.surface
+    val shaderSupported = remember { isRuntimeShaderSupported() }
+    val pageBackdrop = rememberLayerBackdrop { drawRect(surface); drawContent() }
+    val collapsed by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
+        }
+    }
+
     Scaffold(
         containerColor = containerColor,
-
         topBar = {
-            if (navigationIcon == null) {
-                TopAppBar(title = title, scrollBehavior = scrollBehavior)
-            } else {
-                SmallTopAppBar(title = title, navigationIcon = navigationIcon)
+            Box(
+                Modifier.then(
+                    if (shaderSupported && collapsed) Modifier.textureBlur(
+                        backdrop = pageBackdrop,
+                        shape = RectangleShape,
+                        blurRadius = 25f,
+                        colors = BlurDefaults.blurColors(
+                            blendColors = listOf(BlendColorEntry(surface.copy(alpha = 0.8f))),
+                        ),
+                    ) else Modifier,
+                ),
+            ) {
+                if (navigationIcon == null) {
+                    TopAppBar(
+                        title = title,
+                        color = if (collapsed && !shaderSupported) surface else Color.Transparent,
+                        scrollBehavior = scrollBehavior,
+                    )
+                } else {
+                    SmallTopAppBar(
+                        title = title,
+                        color = if (collapsed && !shaderSupported) surface else Color.Transparent,
+                        navigationIcon = navigationIcon,
+                    )
+                }
             }
         },
     ) { padding ->
-        LazyColumn(
-            // Official order: boundary bounce wraps the app-bar scroll connection.
-            // Explicit modifier also supports pages shorter than the viewport.
-            modifier = Modifier
-                .fillMaxSize()
-                .overScrollVertical()
-                .then(
-                    if (navigationIcon == null) Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
-                    else Modifier,
+        Box(Modifier.fillMaxSize().layerBackdrop(pageBackdrop)) {
+            LazyColumn(
+                state = listState,
+                // Official order: boundary bounce wraps the app-bar scroll connection.
+                // Explicit modifier also supports pages shorter than the viewport.
+                modifier = Modifier
+                    .fillMaxSize()
+                    .overScrollVertical()
+                    .then(
+                        if (navigationIcon == null) Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+                        else Modifier,
+                    ),
+                overscrollEffect = null, // Never stack the theme factory with the modifier.
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(
+                    start = padding.calculateStartPadding(layoutDirection),
+                    end = padding.calculateEndPadding(layoutDirection),
+                    top = padding.calculateTopPadding(),
+                    bottom = maxOf(navigationBottom, padding.calculateBottomPadding()) + 24.dp,
                 ),
-            overscrollEffect = null, // Never stack the theme factory with the modifier.
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(
-                start = padding.calculateStartPadding(layoutDirection),
-                end = padding.calculateEndPadding(layoutDirection),
-                top = padding.calculateTopPadding(),
-                bottom = maxOf(navigationBottom, padding.calculateBottomPadding()) + 24.dp,
-            ),
-            content = content,
-        )
+                content = content,
+            )
+        }
     }
 }
 
