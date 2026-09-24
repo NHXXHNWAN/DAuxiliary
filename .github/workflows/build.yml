@@ -41,12 +41,24 @@ jobs:
           RELEASE_KEY_PASSWORD_SECRET: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
           if [ -n "$RELEASE_KEYSTORE_BASE64" ] && [ -n "$RELEASE_STORE_PASSWORD_SECRET" ] && [ -n "$RELEASE_KEY_ALIAS_SECRET" ] && [ -n "$RELEASE_KEY_PASSWORD_SECRET" ]; then
-            # GitHub secret values may contain copied line breaks or CRLF characters.
-            # Remove whitespace before decoding, but do not ignore other invalid characters.
-            keystore_base64="$(printf '%s' "$RELEASE_KEYSTORE_BASE64" | tr -d '[:space:]')"
+            # Accept wrapped Base64, URL-safe Base64, and omitted padding from clipboard tools.
+            keystore_base64="$(printf '%s' "$RELEASE_KEYSTORE_BASE64" | tr -d '[:space:]' | tr '_-' '/+')"
+            if [[ ! "$keystore_base64" =~ ^[A-Za-z0-9+/]*={0,2}$ ]]; then
+              echo "::error::RELEASE_KEYSTORE_BASE64 contains characters outside the Base64 alphabet. Recreate it directly from the .jks file."
+              exit 1
+            fi
+            remainder=$((${#keystore_base64} % 4))
+            if [ "$remainder" -eq 1 ]; then
+              echo "::error::RELEASE_KEYSTORE_BASE64 has an invalid length. Replace the secret with the complete Base64 output."
+              exit 1
+            elif [ "$remainder" -eq 2 ]; then
+              keystore_base64="${keystore_base64}=="
+            elif [ "$remainder" -eq 3 ]; then
+              keystore_base64="${keystore_base64}="
+            fi
             keystore_file="$RUNNER_TEMP/dauxiliary-release.jks"
             if ! printf '%s' "$keystore_base64" | base64 --decode > "$keystore_file"; then
-              echo "::error::RELEASE_KEYSTORE_BASE64 is not valid Base64. Recreate it from the .jks file without quotes or BEGIN/END lines."
+              echo "::error::RELEASE_KEYSTORE_BASE64 could not be decoded. Replace it with the complete Base64 output from the .jks file."
               exit 1
             fi
             if ! keytool -list -keystore "$keystore_file" -storepass "$RELEASE_STORE_PASSWORD_SECRET" >/dev/null 2>&1; then
