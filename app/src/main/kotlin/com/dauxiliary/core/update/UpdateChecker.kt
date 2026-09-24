@@ -56,30 +56,50 @@ object UpdateChecker {
         )
     }
 
-    /** Test builds are published as prereleases with the test- tag prefix. */
+    /** Test channel checks both automatic Test prereleases and the latest stable release. */
     private fun checkTest(currentVersion: String): UpdateInfo? {
-        val releases = requestArray(TEST_RELEASES_API) ?: return null
-        val release = (0 until releases.length())
-            .mapNotNull { releases.optJSONObject(it) }
-            .filter { !it.optBoolean("draft") }
-            .filter { it.optString("tag_name").startsWith("test-", ignoreCase = true) }
-            .maxWithOrNull(compareBy { releaseVersion(it) })
-            ?: return null
-        val latestVersion = normalize(release.optString("tag_name").removePrefix("test-").removePrefix("TEST-"))
+        val candidates = mutableListOf<Pair<JSONObject, UpdateChannel>>()
+        requestArray(TEST_RELEASES_API)?.let { releases ->
+            for (index in 0 until releases.length()) {
+                val release = releases.optJSONObject(index) ?: continue
+                if (!release.optBoolean("draft") && release.optString("tag_name")
+                        .startsWith("test-", ignoreCase = true)
+                ) {
+                    candidates += release to UpdateChannel.TEST
+                }
+            }
+        }
+        request(RELEASES_API)?.let { release ->
+            if (!release.optBoolean("draft") && !release.optBoolean("prerelease")) {
+                candidates += release to UpdateChannel.STABLE
+            }
+        }
+        val selected = candidates.maxWithOrNull(compareBy { releaseVersion(it.first) }) ?: return null
+        val release = selected.first
+        val channel = selected.second
+        val latestVersion = releaseVersion(release)
         if (latestVersion.isBlank() || compareVersions(latestVersion, currentVersion) <= 0) return null
         val releaseUrl = release.optString("html_url").ifBlank { TEST_RELEASES_URL }
         return UpdateInfo(
             currentVersion = normalize(currentVersion),
             latestVersion = latestVersion,
-            releaseNotes = compactNotes(release.optString("body"), "测试版构建。"),
+            releaseNotes = compactNotes(
+                release.optString("body"),
+                if (channel == UpdateChannel.TEST) "测试版构建。" else "正式版发布。",
+            ),
             downloadUrl = findApkUrl(release) ?: releaseUrl,
             releaseUrl = releaseUrl,
-            channel = UpdateChannel.TEST,
+            channel = channel,
         )
     }
 
-    private fun releaseVersion(release: JSONObject): String =
-        normalize(release.optString("tag_name").removePrefix("test-").removePrefix("TEST-"))
+    private fun releaseVersion(release: JSONObject): String {
+        val tag = release.optString("tag_name")
+            .removePrefix("test-")
+            .removePrefix("TEST-")
+        // Test tags end with the short commit SHA; it is not part of the APK version.
+        return normalize(tag.substringBeforeLast("-", missingDelimiterValue = tag))
+    }
 
     private fun compactNotes(body: String, fallback: String): String = body
         .lineSequence()
