@@ -3,19 +3,10 @@ name: Build and Publish DAuxiliary
 on:
   push:
     branches: ["Test"]
-    tags: ["v*"]
   pull_request:
     branches: ["Test"]
   workflow_dispatch:
     inputs:
-      version_name:
-        description: "Release version, for example 0.2.0"
-        required: true
-        default: "0.2.0"
-      version_code:
-        description: "Android versionCode"
-        required: true
-        default: "2"
       release_notes:
         description: "Release notes; leave empty to generate notes from commits"
         required: false
@@ -77,30 +68,19 @@ jobs:
             } >> "$GITHUB_ENV"
           fi
 
-      - name: Resolve release version
+      - name: Generate release version
         id: release
         env:
-          INPUT_VERSION_NAME: ${{ inputs.version_name }}
-          INPUT_VERSION_CODE: ${{ inputs.version_code }}
+          TZ: Asia/Shanghai
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            version_name="${GITHUB_REF_NAME#v}"
-            version_code="${{ github.run_number }}"
-          else
-            version_name="${INPUT_VERSION_NAME:-0.2.0}"
-            version_code="${INPUT_VERSION_CODE:-2}"
-          fi
-          if [[ ! "$version_name" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
-            echo "Invalid version_name: $version_name"
-            exit 1
-          fi
-          if [[ ! "$version_code" =~ ^[1-9][0-9]*$ ]]; then
-            echo "Invalid version_code: $version_code"
-            exit 1
-          fi
+          # Version format: yyyyMMddHHmm, for example 202609242246.
+          version_name="$(date '+%Y%m%d%H%M')"
+          # Use Unix seconds for versionCode: monotonic, unique, and below Android's 2.1B limit until 2036.
+          version_code="$(date '+%s')"
           echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
           echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
           echo "tag=v$version_name" >> "$GITHUB_OUTPUT"
+          echo "Generated version: $version_name (versionCode: $version_code)"
 
       - name: Build release APK
         run: ./gradlew :app:assembleRelease --no-daemon --console=plain -PversionName=${{ steps.release.outputs.version_name }} -PversionCode=${{ steps.release.outputs.version_code }}
