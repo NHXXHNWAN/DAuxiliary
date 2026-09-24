@@ -1,6 +1,6 @@
 package com.dauxiliary.ui.page
-
 import androidx.compose.runtime.Composable
+
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
@@ -12,6 +12,8 @@ fun SettingsPage(
     onColorModeChange: (Int) -> Unit,
     floatingNavigationBarStyle: Int,
     onFloatingNavigationBarStyleChange: (Int) -> Unit,
+    updateChannel: Int,
+    onUpdateChannelChange: (Int) -> Unit,
 ) {
     GroupedPage(title = "设置") {
         item { SmallTitle(text = "外观") }
@@ -28,6 +30,12 @@ fun SettingsPage(
                     items = listOf("Default", "iOS-like"),
                     selectedIndex = floatingNavigationBarStyle.coerceIn(0, 1),
                     onSelectedIndexChange = onFloatingNavigationBarStyleChange,
+                )
+                OverlayDropdownPreference(
+                    title = "更新通道",
+                    items = listOf("稳定版（Release）", "测试版（Test）"),
+                    selectedIndex = updateChannel.coerceIn(0, 1),
+                    onSelectedIndexChange = onUpdateChannelChange,
                 )
             }
         }

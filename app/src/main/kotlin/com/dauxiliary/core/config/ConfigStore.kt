@@ -13,6 +13,7 @@ object ConfigStore {
     const val KEY_BACKGROUND_EFFECT_VARIANT = "background_effect_variant"
     const val KEY_DYNAMIC_BACKGROUND = "dynamic_background"
     const val KEY_FULLSCREEN_BACKGROUND = "fullscreen_background"
+    const val KEY_UPDATE_CHANNEL = "update_channel"
     private const val KEY_HOST_FEATURE_PREFIX = "enabled_features_"
     private const val KEY_HOST_LAST_SEEN_PREFIX = "host_last_seen_"
     private const val HOST_ACTIVE_WINDOW_MS = 5 * 60 * 1000L

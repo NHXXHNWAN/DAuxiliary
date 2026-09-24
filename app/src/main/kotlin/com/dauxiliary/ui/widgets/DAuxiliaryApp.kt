@@ -38,18 +38,13 @@ import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
 import top.yukonga.miuix.kmp.nav.transition.NavTransitions
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-/** Root app navigation. Miuix NavDisplay owns About transitions and predictive back. */
 @Composable
 fun DAuxiliaryApp(
     colorMode: Int = 0,
     onColorModeChange: (Int) -> Unit = {},
 ) {
     val backStack = rememberNavBackStack<AppRoute>(AppRoute.Home)
-
-    NavDisplay(
-        backStack = backStack,
-        transition = NavTransitions.MiuixDefault,
-    ) {
+    NavDisplay(backStack = backStack, transition = NavTransitions.MiuixDefault) {
         entry<AppRoute.Home> {
             MainNavigation(
                 colorMode = colorMode,
@@ -72,9 +67,11 @@ private fun MainNavigation(
     val context = LocalContext.current
     var navigationBarStyle by rememberSaveable {
         mutableIntStateOf(
-            ConfigStore.prefs(context)
-                .getInt(ConfigStore.KEY_FLOATING_NAVIGATION_BAR_STYLE, 0),
+            ConfigStore.prefs(context).getInt(ConfigStore.KEY_FLOATING_NAVIGATION_BAR_STYLE, 0),
         )
+    }
+    var updateChannel by rememberSaveable {
+        mutableIntStateOf(ConfigStore.prefs(context).getInt(ConfigStore.KEY_UPDATE_CHANNEL, 0))
     }
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 3 })
     val scope = rememberCoroutineScope()
@@ -129,11 +126,7 @@ private fun MainNavigation(
             }
         },
     ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .layerBackdrop(contentBackdrop),
-        ) {
+        Box(Modifier.fillMaxSize().layerBackdrop(contentBackdrop)) {
             CompositionLocalProvider(LocalNavigationPadding provides padding) {
                 HorizontalPager(
                     state = pagerState,
@@ -141,7 +134,7 @@ private fun MainNavigation(
                     userScrollEnabled = true,
                 ) { page ->
                     when (page) {
-                        0 -> HomePage()
+                        0 -> HomePage(updateChannelIndex = updateChannel)
                         1 -> ManagePage()
                         2 -> SettingsPage(
                             onAboutClick = onAboutClick,
@@ -152,6 +145,13 @@ private fun MainNavigation(
                                 navigationBarStyle = it
                                 ConfigStore.prefs(context).edit()
                                     .putInt(ConfigStore.KEY_FLOATING_NAVIGATION_BAR_STYLE, it)
+                                    .apply()
+                            },
+                            updateChannel = updateChannel,
+                            onUpdateChannelChange = {
+                                updateChannel = it
+                                ConfigStore.prefs(context).edit()
+                                    .putInt(ConfigStore.KEY_UPDATE_CHANNEL, it)
                                     .apply()
                             },
                         )

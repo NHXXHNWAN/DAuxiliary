@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import com.dauxiliary.BuildConfig
 import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.core.registry.AppTarget
+import com.dauxiliary.core.update.UpdateChannel
 import com.dauxiliary.core.update.UpdateChecker
 import com.dauxiliary.core.update.UpdateInfo
 import com.dauxiliary.ui.theme.isAppInDarkTheme
@@ -42,9 +43,10 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /** Desktop overview with the module status and enabled host count. */
 @Composable
-fun HomePage() {
+fun HomePage(updateChannelIndex: Int) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val updateChannel = UpdateChannel.entries[updateChannelIndex.coerceIn(0, UpdateChannel.entries.lastIndex)]
     var refresh by remember { mutableIntStateOf(0) }
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var checkUpdates by remember { mutableIntStateOf(0) }
@@ -57,9 +59,9 @@ fun HomePage() {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    LaunchedEffect(checkUpdates) {
+    LaunchedEffect(checkUpdates, updateChannel) {
         while (true) {
-            updateInfo = UpdateChecker.check(BuildConfig.VERSION_NAME)
+            updateInfo = UpdateChecker.check(BuildConfig.VERSION_NAME, updateChannel)
             delay(30 * 60 * 1_000L)
         }
     }

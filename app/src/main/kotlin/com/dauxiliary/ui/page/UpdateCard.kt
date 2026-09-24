@@ -42,7 +42,7 @@ internal fun UpdateCard(
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text(
-                text = "发现新版本",
+                text = "发现${update.channel.label}",
                 color = titleColor,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
