@@ -1,27 +1,27 @@
 package com.dauxiliary.ui.injected
 
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-
 import com.dauxiliary.BuildConfig
-import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.core.feature.FeatureDefinition
 import com.dauxiliary.core.feature.FeatureRegistry
 import com.dauxiliary.core.registry.AppTarget
 import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.SmallTitle
-import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 
 @Composable
 internal fun ModuleSettingsHome(host: AppTarget, onOpenFeatures: () -> Unit) {
@@ -33,7 +33,7 @@ internal fun ModuleSettingsHome(host: AppTarget, onOpenFeatures: () -> Unit) {
             InjectedGroupCard {
                 BasicComponent(
                     title = "已启动 ${enabled} 个功能",
-                    summary = "当前设置仅作用于 ${host.displayName}，功能 Hook 状态以宿主进程加载结果为准。",
+                    summary = "当前设置仅作用于 ${host.displayName}。",
                 )
                 ArrowPreference(
                     title = "功能设置",
@@ -101,19 +101,7 @@ internal fun ModuleLogPage(host: AppTarget, onBack: () -> Unit) {
 
 @Composable
 internal fun ModuleSettingsPage(host: AppTarget, onBack: () -> Unit) {
-    val context = LocalContext.current
     InjectedGroupedPage(title = "设置", onBack = onBack) {
-        item { SmallTitle(text = "模块") }
-        item {
-            InjectedGroupCard {
-                SwitchPreference(
-                    title = "模块总开关",
-                    summary = "关闭后 ${host.displayName} 中的功能 Hook 不会执行。",
-                    checked = ConfigStore.isMasterEnabled(context),
-                    onCheckedChange = { ConfigStore.setMasterSwitch(context, it) },
-                )
-            }
-        }
         item { SmallTitle(text = "开源信息") }
         item {
             InjectedGroupCard {
@@ -136,11 +124,8 @@ internal fun InjectedGroupedPage(
         title = title,
         navigationIcon = onBack?.let {
             {
-                top.yukonga.miuix.kmp.basic.IconButton(onClick = it) {
-                    top.yukonga.miuix.kmp.basic.Icon(
-                        imageVector = MiuixIcons.Back,
-                        contentDescription = "返回",
-                    )
+                IconButton(onClick = it) {
+                    Icon(imageVector = MiuixIcons.Back, contentDescription = "返回")
                 }
             }
         },

@@ -23,6 +23,12 @@
             </intent-filter>
         </activity>
 
+        <provider
+            android:name=".core.config.ModuleStatusProvider"
+            android:authorities="com.dauxiliary.status"
+            android:exported="true"
+            android:grantUriPermissions="false" />
+
         <!-- Xposed module metadata -->
         <meta-data
             android:name="xposedmodule"

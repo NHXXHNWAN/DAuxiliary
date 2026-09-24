@@ -17,9 +17,9 @@ fun AppTheme(
     MiuixTheme(controller = controller, content = content)
 }
 
-/** Resolve explicit light/dark modes for the upstream liquid-glass effects. */
+/** Resolves explicit light/dark modes for the Miuix background effect. */
 @Composable
-internal fun isAppInDarkTheme(): Boolean = when (MiuixTheme.colorSchemeMode) {
+fun isAppInDarkTheme(): Boolean = when (MiuixTheme.colorSchemeMode) {
     ColorSchemeMode.Light, ColorSchemeMode.MonetLight -> false
     ColorSchemeMode.Dark, ColorSchemeMode.MonetDark -> true
     else -> isSystemInDarkTheme()

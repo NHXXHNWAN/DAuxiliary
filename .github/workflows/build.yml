@@ -13,9 +13,8 @@ permissions:
 
 jobs:
   build:
-    name: Assemble APKs
+    name: Build release APK
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,8 +26,6 @@ jobs:
           java-version: "21"
           cache: gradle
 
-      # ubuntu-latest provides the Android SDK used by this project.
-      # Do not invoke sdkmanager because its package index may lack android-37.
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
@@ -47,21 +44,13 @@ jobs:
               echo "RELEASE_KEY_ALIAS=$RELEASE_KEY_ALIAS_SECRET"
               echo "RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD_SECRET"
             } >> "$GITHUB_ENV"
-            echo "Using the fixed release keystore from GitHub Secrets."
           else
-            echo "Fixed signing secrets are not configured; using a temporary test key."
+            echo "Release signing secrets are not configured; generating a temporary CI key."
             store_password="$(openssl rand -hex 16)"
-            keytool -genkeypair \
-              -storetype JKS \
-              -alias dauxiliary-ci \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 3650 \
-              -keystore "$RUNNER_TEMP/dauxiliary-release.jks" \
-              -storepass "$store_password" \
-              -keypass "$store_password" \
-              -dname "CN=DAuxiliary CI, OU=Development, O=DAuxiliary, C=CN" \
-              -noprompt
+            keytool -genkeypair -storetype JKS -alias dauxiliary-ci -keyalg RSA -keysize 2048 \
+              -validity 3650 -keystore "$RUNNER_TEMP/dauxiliary-release.jks" \
+              -storepass "$store_password" -keypass "$store_password" \
+              -dname "CN=DAuxiliary CI, OU=Development, O=DAuxiliary, C=CN" -noprompt
             {
               echo "RELEASE_STORE_FILE=$RUNNER_TEMP/dauxiliary-release.jks"
               echo "RELEASE_STORE_PASSWORD=$store_password"
@@ -70,34 +59,14 @@ jobs:
             } >> "$GITHUB_ENV"
           fi
 
-      - name: Build Debug APK
-        run: |
-          set -o pipefail
-          ./gradlew :app:assembleDebug --no-daemon --console=plain 2>&1 | tee "$RUNNER_TEMP/debug-build.log"
-      - name: Print Kotlin diagnostics
-        if: failure()
-        run: |
-          echo '--- Kotlin compiler diagnostics ---'
-          grep -E '(^e: |\.kt:[0-9]+:[0-9]+|^error: |Compilation error)' "$RUNNER_TEMP/debug-build.log" || true
-      - name: Upload Kotlin build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: kotlin-build-log-${{ github.sha }}
-          path: ${{ runner.temp }}/debug-build.log
-          if-no-files-found: warn
-          retention-days: 7
-      - name: Build Release APK
-        if: success()
+      - name: Build release APK
         run: ./gradlew :app:assembleRelease --no-daemon --console=plain
 
-      - name: Upload APK artifacts
+      - name: Upload release APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DAuxiliary-apks-${{ github.sha }}
-          path: |
-            app/build/outputs/apk/debug/*.apk
-            app/build/outputs/apk/release/*.apk
+          name: DAuxiliary-release-${{ github.sha }}
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14
 
@@ -108,6 +77,5 @@ jobs:
         run: |
           gh release create "${GITHUB_REF_NAME}" \
             app/build/outputs/apk/release/*.apk \
-            app/build/outputs/apk/debug/*.apk \
             --title "DAuxiliary ${GITHUB_REF_NAME}" \
             --generate-notes

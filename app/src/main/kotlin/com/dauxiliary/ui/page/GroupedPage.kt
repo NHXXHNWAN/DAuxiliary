@@ -26,13 +26,15 @@ internal val LocalNavigationPadding = compositionLocalOf { PaddingValues() }
 fun GroupedPage(
     title: String,
     navigationIcon: (@Composable () -> Unit)? = null,
+    containerColor: androidx.compose.ui.graphics.Color = MiuixTheme.colorScheme.surface,
     content: LazyListScope.() -> Unit,
 ) {
     val scrollBehavior = MiuixScrollBehavior()
     val navigationBottom = LocalNavigationPadding.current.calculateBottomPadding()
     val layoutDirection = LocalLayoutDirection.current
     Scaffold(
-        containerColor = MiuixTheme.colorScheme.surface,
+        containerColor = containerColor,
+
         topBar = {
             if (navigationIcon == null) {
                 TopAppBar(title = title, scrollBehavior = scrollBehavior)
