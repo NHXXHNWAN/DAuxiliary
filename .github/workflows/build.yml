@@ -41,9 +41,20 @@ jobs:
           RELEASE_KEY_PASSWORD_SECRET: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
           if [ -n "$RELEASE_KEYSTORE_BASE64" ] && [ -n "$RELEASE_STORE_PASSWORD_SECRET" ] && [ -n "$RELEASE_KEY_ALIAS_SECRET" ] && [ -n "$RELEASE_KEY_PASSWORD_SECRET" ]; then
-            echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/dauxiliary-release.jks"
+            # GitHub secret values may contain copied line breaks or CRLF characters.
+            # Remove whitespace before decoding, but do not ignore other invalid characters.
+            keystore_base64="$(printf '%s' "$RELEASE_KEYSTORE_BASE64" | tr -d '[:space:]')"
+            keystore_file="$RUNNER_TEMP/dauxiliary-release.jks"
+            if ! printf '%s' "$keystore_base64" | base64 --decode > "$keystore_file"; then
+              echo "::error::RELEASE_KEYSTORE_BASE64 is not valid Base64. Recreate it from the .jks file without quotes or BEGIN/END lines."
+              exit 1
+            fi
+            if ! keytool -list -keystore "$keystore_file" -storepass "$RELEASE_STORE_PASSWORD_SECRET" >/dev/null 2>&1; then
+              echo "::error::The decoded keystore cannot be opened. Check the Base64 value and RELEASE_STORE_PASSWORD."
+              exit 1
+            fi
             {
-              echo "RELEASE_STORE_FILE=$RUNNER_TEMP/dauxiliary-release.jks"
+              echo "RELEASE_STORE_FILE=$keystore_file"
               echo "RELEASE_STORE_PASSWORD=$RELEASE_STORE_PASSWORD_SECRET"
               echo "RELEASE_KEY_ALIAS=$RELEASE_KEY_ALIAS_SECRET"
               echo "RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD_SECRET"
