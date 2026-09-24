@@ -6,9 +6,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+
 
 data class UpdateInfo(
     val currentVersion: String,
@@ -30,8 +28,6 @@ object UpdateChecker {
     private const val TEST_RELEASES_API = "https://api.github.com/repos/$REPOSITORY/releases?per_page=100"
     private const val TEST_RELEASES_URL = "https://github.com/$REPOSITORY/releases?q=test-"
     private const val USER_AGENT = "DAuxiliary-UpdateChecker"
-    private val versionFormatter = DateTimeFormatter.ofPattern("yyyyMMddHHmm")
-        .withZone(ZoneId.of("Asia/Shanghai"))
 
     suspend fun check(currentVersion: String, channel: UpdateChannel): UpdateInfo? =
         withContext(Dispatchers.IO) {

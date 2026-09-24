@@ -75,8 +75,9 @@ jobs:
           version_code="$(date '+%s')"
           echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
           echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
+          short_sha="${GITHUB_SHA:0:7}"
           echo "stable_tag=v$version_name" >> "$GITHUB_OUTPUT"
-          echo "test_tag=test-$version_name" >> "$GITHUB_OUTPUT"
+          echo "test_tag=test-$version_name-$short_sha" >> "$GITHUB_OUTPUT"
           echo "Generated version: $version_name (versionCode: $version_code)"
 
       - name: Build release APK
@@ -96,13 +97,18 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/Test'
         env:
           GH_TOKEN: ${{ github.token }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           release_tag="${{ steps.release.outputs.test_tag }}"
           notes_file="$RUNNER_TEMP/test-release-notes.md"
-          printf '%s\n' \
-            "增加：${{ github.event.head_commit.message }}" \
-            "优化：Test 分支自动构建与发布" \
-            "修复：持续集成构建流程" > "$notes_file"
+          message="$(printf '%s' "$COMMIT_MESSAGE" | head -n 1 | cut -c1-80)"
+          case "${message,,}" in
+            feat:*|add:*|增加：*) note="增加：${message#*: }" ;;
+            fix:*|修复：*) note="修复：${message#*: }" ;;
+            perf:*|refactor:*|优化：*) note="优化：${message#*: }" ;;
+            *) note="变更：$message" ;;
+          esac
+          printf '%s\n' "$note" > "$notes_file"
           gh release create "$release_tag" app/build/outputs/apk/release/*.apk \
             --prerelease \
             --title "DAuxiliary 测试版 ${{ steps.release.outputs.version_name }}" \
