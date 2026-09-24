@@ -2,6 +2,7 @@ package com.dauxiliary.core.update
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -26,8 +27,8 @@ enum class UpdateChannel(val label: String) {
 object UpdateChecker {
     private const val REPOSITORY = "NHXXHNWAN/DAuxiliary"
     private const val RELEASES_API = "https://api.github.com/repos/$REPOSITORY/releases/latest"
-    private const val TEST_COMMIT_API = "https://api.github.com/repos/$REPOSITORY/commits/Test"
-    private const val TEST_BRANCH_URL = "https://github.com/$REPOSITORY/tree/Test"
+    private const val TEST_RELEASES_API = "https://api.github.com/repos/$REPOSITORY/releases?per_page=100"
+    private const val TEST_RELEASES_URL = "https://github.com/$REPOSITORY/releases?q=test-"
     private const val USER_AGENT = "DAuxiliary-UpdateChecker"
     private val versionFormatter = DateTimeFormatter.ofPattern("yyyyMMddHHmm")
         .withZone(ZoneId.of("Asia/Shanghai"))
@@ -59,37 +60,38 @@ object UpdateChecker {
         )
     }
 
-    /** Test builds use the latest Test commit timestamp because Test pushes do not publish Releases. */
+    /** Test builds are published as prereleases with the test- tag prefix. */
     private fun checkTest(currentVersion: String): UpdateInfo? {
-        val commit = request(TEST_COMMIT_API) ?: return null
-        val commitTime = commit.optJSONObject("commit")
-            ?.optJSONObject("committer")
-            ?.optString("date")
-            ?.takeIf { it.isNotBlank() }
+        val releases = requestArray(TEST_RELEASES_API) ?: return null
+        val release = (0 until releases.length())
+            .mapNotNull { releases.optJSONObject(it) }
+            .filter { !it.optBoolean("draft") }
+            .filter { it.optString("tag_name").startsWith("test-", ignoreCase = true) }
+            .maxWithOrNull(compareBy { releaseVersion(it) })
             ?: return null
-        val latestVersion = runCatching {
-            versionFormatter.format(Instant.parse(commitTime))
-        }.getOrNull() ?: return null
-        if (compareVersions(latestVersion, currentVersion) <= 0) return null
-
-        val message = commit.optJSONObject("commit")
-            ?.optString("message")
-            ?.lineSequence()
-            ?.firstOrNull()
-            ?.trim()
-            .orEmpty()
-            .ifBlank { "Test 分支最新构建。" }
-        val commitUrl = commit.optString("html_url").ifBlank { TEST_BRANCH_URL }
+        val latestVersion = normalize(release.optString("tag_name").removePrefix("test-").removePrefix("TEST-"))
+        if (latestVersion.isBlank() || compareVersions(latestVersion, currentVersion) <= 0) return null
+        val releaseUrl = release.optString("html_url").ifBlank { TEST_RELEASES_URL }
         return UpdateInfo(
             currentVersion = normalize(currentVersion),
             latestVersion = latestVersion,
-            releaseNotes = "Test 分支：$message",
-            // Test pushes only upload Actions artifacts, so link to the exact commit page.
-            downloadUrl = commitUrl,
-            releaseUrl = commitUrl,
+            releaseNotes = compactNotes(release.optString("body"), "测试版构建。"),
+            downloadUrl = findApkUrl(release) ?: releaseUrl,
+            releaseUrl = releaseUrl,
             channel = UpdateChannel.TEST,
         )
     }
+
+    private fun releaseVersion(release: JSONObject): String =
+        normalize(release.optString("tag_name").removePrefix("test-").removePrefix("TEST-"))
+
+    private fun compactNotes(body: String, fallback: String): String = body
+        .lineSequence()
+        .map { it.trim() }
+        .filter { it.isNotBlank() && !it.startsWith("#") }
+        .take(3)
+        .joinToString("\n")
+        .ifBlank { fallback }
 
     private fun findApkUrl(release: JSONObject): String? {
         val assets = release.optJSONArray("assets") ?: return null
@@ -102,14 +104,18 @@ object UpdateChecker {
         return null
     }
 
-    private fun request(url: String): JSONObject? {
-        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 10_000
-            readTimeout = 10_000
-            setRequestProperty("Accept", "application/vnd.github+json")
-            setRequestProperty("User-Agent", USER_AGENT)
+    private fun requestArray(url: String): JSONArray? {
+        val connection = openConnection(url)
+        return try {
+            if (connection.responseCode !in 200..299) null
+            else JSONArray(connection.inputStream.bufferedReader().use { it.readText() })
+        } finally {
+            connection.disconnect()
         }
+    }
+
+    private fun request(url: String): JSONObject? {
+        val connection = openConnection(url)
         return try {
             if (connection.responseCode !in 200..299) null
             else JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
@@ -117,6 +123,15 @@ object UpdateChecker {
             connection.disconnect()
         }
     }
+
+    private fun openConnection(url: String): HttpURLConnection =
+        (URL(url).openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 10_000
+            readTimeout = 10_000
+            setRequestProperty("Accept", "application/vnd.github+json")
+            setRequestProperty("User-Agent", USER_AGENT)
+        }
 
     private fun normalize(version: String): String =
         version.trim().removePrefix("v").removePrefix("V")
