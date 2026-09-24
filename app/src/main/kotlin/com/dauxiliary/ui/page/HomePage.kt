@@ -1,7 +1,15 @@
 package com.dauxiliary.ui.page
 
-import android.content.Intent
-import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -27,11 +36,13 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.dauxiliary.BuildConfig
 import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.core.registry.AppTarget
+import com.dauxiliary.core.update.ApkInstaller
 import com.dauxiliary.core.update.UpdateChannel
 import com.dauxiliary.core.update.UpdateChecker
 import com.dauxiliary.core.update.UpdateInfo
 import com.dauxiliary.ui.theme.isAppInDarkTheme
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -48,10 +59,13 @@ fun HomePage(
     onUpdateResult: (UpdateInfo?) -> Unit,
 ) {
     val context = LocalContext.current
+    val updateScope = rememberCoroutineScope()
+    var isDownloading by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
     val updateChannel = UpdateChannel.entries[updateChannelIndex.coerceIn(0, UpdateChannel.entries.lastIndex)]
     var refresh by remember { mutableIntStateOf(0) }
     var checkUpdates by remember { mutableIntStateOf(0) }
+    var isCheckingUpdate by remember { mutableStateOf(true) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -62,8 +76,11 @@ fun HomePage(
     }
 
     LaunchedEffect(checkUpdates, updateChannel) {
+        isCheckingUpdate = true
+        onUpdateResult(null)
         while (true) {
             onUpdateResult(UpdateChecker.check(BuildConfig.VERSION_NAME, updateChannel))
+            isCheckingUpdate = false
             delay(30 * 60 * 1_000L)
         }
     }
@@ -126,17 +143,6 @@ fun HomePage(
                 }
             }
         }
-        preservedUpdate?.let { update ->
-            item(key = "available_update_${update.channel.name}") {
-                UpdateCard(
-                    update = update,
-                    darkTheme = darkTheme,
-                    onUpdateClick = {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(update.downloadUrl)))
-                    },
-                )
-            }
-        }
         item(key = "enabled_hosts") {
             Card(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -147,6 +153,33 @@ fun HomePage(
                     titleColor = BasicComponentDefaults.titleColor(MiuixTheme.colorScheme.onSurfaceVariantSummary),
                     summaryColor = BasicComponentDefaults.summaryColor(MiuixTheme.colorScheme.onSurface),
                 )
+            }
+        }
+        item(key = "update_slot") {
+            AnimatedVisibility(
+                visible = preservedUpdate != null || isCheckingUpdate,
+                enter = fadeIn(tween(350)) + expandVertically(tween(350)),
+                exit = fadeOut(tween(200)) + shrinkVertically(tween(200)),
+            ) {
+                if (isCheckingUpdate && preservedUpdate == null) {
+                    UpdateLoadingCard(darkTheme)
+                }
+                preservedUpdate?.let { update ->
+                    UpdateCard(
+                        update = update,
+                        darkTheme = darkTheme,
+                        isDownloading = isDownloading,
+                        onUpdateClick = {
+                            if (!isDownloading) {
+                                isDownloading = true
+                                updateScope.launch {
+                                    ApkInstaller.downloadAndInstall(context, update.downloadUrl)
+                                    isDownloading = false
+                                }
+                            }
+                        },
+                    )
+                }
             }
         }
     }

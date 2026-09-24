@@ -43,6 +43,7 @@ object UpdateChecker {
         val release = request(RELEASES_API) ?: return null
         if (release.optBoolean("draft") || release.optBoolean("prerelease")) return null
         val latestVersion = normalize(release.optString("tag_name"))
+        val apkUrl = findApkUrl(release) ?: return null
         if (latestVersion.isBlank() || compareVersions(latestVersion, currentVersion) <= 0) return null
         return UpdateInfo(
             currentVersion = normalize(currentVersion),
@@ -50,7 +51,7 @@ object UpdateChecker {
             releaseNotes = release.optString("body").trim()
                 .ifBlank { release.optString("name").trim() }
                 .ifBlank { "该版本暂无更新说明。" },
-            downloadUrl = findApkUrl(release) ?: release.optString("html_url"),
+            downloadUrl = apkUrl,
             releaseUrl = release.optString("html_url"),
             channel = UpdateChannel.STABLE,
         )
@@ -79,6 +80,7 @@ object UpdateChecker {
         val channel = selected.second
         val latestVersion = releaseVersion(release)
         if (latestVersion.isBlank() || compareVersions(latestVersion, currentVersion) <= 0) return null
+        val apkUrl = findApkUrl(release) ?: return null
         val releaseUrl = release.optString("html_url").ifBlank { TEST_RELEASES_URL }
         return UpdateInfo(
             currentVersion = normalize(currentVersion),
@@ -87,7 +89,7 @@ object UpdateChecker {
                 release.optString("body"),
                 if (channel == UpdateChannel.TEST) "测试版构建。" else "正式版发布。",
             ),
-            downloadUrl = findApkUrl(release) ?: releaseUrl,
+            downloadUrl = apkUrl,
             releaseUrl = releaseUrl,
             channel = channel,
         )

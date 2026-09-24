@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -32,6 +33,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 internal fun UpdateCard(
     update: UpdateInfo,
     darkTheme: Boolean,
+    isDownloading: Boolean,
     onUpdateClick: () -> Unit,
 ) {
     val accent = if (update.channel.name == "TEST") {
@@ -114,8 +116,12 @@ internal fun UpdateCard(
                     color = summaryColor,
                     fontSize = 12.sp,
                 )
-                Button(onClick = onUpdateClick) {
-                    Text("查看")
+                Button(
+                    onClick = onUpdateClick,
+                    enabled = !isDownloading,
+                    modifier = Modifier.alpha(if (isDownloading) 0.7f else 1f),
+                ) {
+                    Text(if (isDownloading) "下载中" else "下载并安装")
                 }
             }
         }
