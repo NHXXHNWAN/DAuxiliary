@@ -27,7 +27,8 @@ DAuxiliary 不是一个独立的抖音客户端，也不修改或重新分发抖
 - [ ] 实际抖音功能 Hook
 - [ ] 功能注册表和按功能隔离的 Hook 生命周期
 - [ ] 真机验证不同抖音版本、进程和 ROM 行为
-- [ ] Release 签名与发布流程
+- [x] GitHub Actions Debug/Release 构建与 Tag 发布流程
+- [ ] Release 签名配置（需要通过 GitHub Secrets 提供 keystore）
 
 ## 技术栈
 
@@ -63,7 +64,18 @@ CONTRIBUTING.md                     # 开发和提交规范
 gradle/libs.versions.toml          # 依赖版本目录
 ```
 
-## 构建
+## 构建与发布
+
+推送到 `Test` 分支会自动构建 Debug 和 Release APK，并将 APK 保存为 GitHub Actions artifact。
+
+要发布 GitHub Release，创建并推送一个版本标签：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+标签发布会自动创建同名 GitHub Release，并上传 Debug/Release APK。当前 Release APK 尚未配置签名，只适合测试；正式分发前应通过 GitHub Secrets 配置 keystore，避免将签名私钥提交到仓库。
 
 环境要求：
 

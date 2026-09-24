@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
+
         android:allowBackup="true"
         android:icon="@drawable/ic_launcher"
+        android:roundIcon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.DAuxiliary"
@@ -13,6 +16,7 @@
         <!-- Main UI entry (Compose + Miuix) -->
         <activity
             android:name=".ui.MainActivity"
+            android:enableOnBackInvokedCallback="true"
             android:exported="true"
             android:label="@string/app_name">
             <intent-filter>
@@ -20,6 +24,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <provider
+            android:name=".core.config.ModuleStatusProvider"
+            android:authorities="com.dauxiliary.status"
+            android:exported="true"
+            android:grantUriPermissions="false" />
 
         <!-- Xposed module metadata -->
         <meta-data

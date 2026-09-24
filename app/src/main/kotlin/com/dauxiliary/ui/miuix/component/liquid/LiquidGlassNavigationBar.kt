@@ -94,7 +94,7 @@ import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.Platform
 import top.yukonga.miuix.kmp.utils.platform
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.dauxiliary.ui.theme.isAppInDarkTheme
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -192,7 +192,7 @@ private fun rememberGravityRotatedHighlight(
 }
 
 @Composable
-fun IosLiquidGlassNavigationBar(
+internal fun IosLiquidGlassNavigationBar(
     items: List<NavigationItem>,
     selectedIndex: Int,
     onItemClick: (Int) -> Unit,
@@ -201,7 +201,7 @@ fun IosLiquidGlassNavigationBar(
     modifier: Modifier = Modifier,
     badge: (Int) -> (@Composable () -> Unit)? = { null },
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
     val pillShape = remember { CircleShape }
     val accentColor = MiuixTheme.colorScheme.primary
     val tabContentColor = MiuixTheme.colorScheme.onSurface

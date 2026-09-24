@@ -2,8 +2,10 @@ package com.dauxiliary.core.xposed
 
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XposedBridge
+import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import com.dauxiliary.core.config.ConfigStore
+import com.dauxiliary.core.registry.AppTarget
 
 /**
  * Xposed entry point. Registered in assets/xposed_init.
@@ -16,27 +18,23 @@ import com.dauxiliary.core.config.ConfigStore
 class EntryHook : IXposedHookLoadPackage {
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
-        // Only hook the Douyin package
-        if (lpparam.packageName != DOUYIN_PACKAGE) return
+        val target = AppTarget.fromPackageName(lpparam.packageName) ?: return
 
-        log("Loaded into ${lpparam.packageName} (pid=${android.os.Process.myPid()})")
+        log("Loaded into ${target.displayName} (${lpparam.packageName}, pid=${android.os.Process.myPid()})")
 
-        // 入口必须始终安装，否则模块关闭后用户无法在抖音内重新打开它。
-        // 具体功能 Hook 再根据 ConfigStore.KEY_MASTER_SWITCH 判断是否执行。
-        DouyinEntryHook.install()
-
-        if (!ConfigStore.readFromHookedProcess(ConfigStore.KEY_MASTER_SWITCH, false)) {
-            log("Module switch is disabled; feature hooks are skipped")
-            return
+        HostEntryHook.install(target)
+        runCatching {
+            val activityThread = XposedHelpers.findClass("android.app.ActivityThread", null)
+            XposedHelpers.callStaticMethod(activityThread, "currentApplication") as? android.content.Context
+        }.getOrNull()?.let { context ->
+            ConfigStore.recordHostLoaded(context, target)
         }
+        if (!ConfigStore.isApplicationEnabledInHookedProcess(target.packageName)) return
 
-        // TODO: 在这里注册实际的抖音功能 Hook；配置入口与 Hook 分发必须保持独立。
+        // TODO: 在这里注册各宿主的真实功能 Hook；配置入口与 Hook 分发保持独立。
         // FeatureRegistry.dispatch(lpparam)
     }
-
     companion object {
-        private const val DOUYIN_PACKAGE = "com.ss.android.ugc.aweme"
-
         fun log(msg: String, throwable: Throwable? = null) {
             XposedBridge.log("[DAuxiliary] $msg")
             throwable?.let { XposedBridge.log(it) }
