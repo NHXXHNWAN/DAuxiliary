@@ -18,7 +18,7 @@ object FeatureRegistry {
         FeatureDefinition(
             id = "privacy.hide_online_status",
             title = "隐私状态增强",
-            summary = "功能开关已预留，具体宿主 Hook 将在后续版本接入。",
+            summary = "隐私状态增强。",
             category = FeatureCategory.PRIVACY,
             hosts = AppTarget.entries.toSet(),
         ),
@@ -39,21 +39,21 @@ object FeatureRegistry {
         FeatureDefinition(
             id = "wechat.chat_tools",
             title = "微信聊天辅助",
-            summary = "微信专属功能占位，等待对应 Hook 实现。",
+            summary = "微信聊天辅助。",
             category = FeatureCategory.CHAT,
             hosts = setOf(AppTarget.WECHAT),
         ),
         FeatureDefinition(
             id = "douyin.content_tools",
             title = "抖音内容辅助",
-            summary = "抖音专属功能占位，等待对应 Hook 实现。",
+            summary = "抖音内容辅助。",
             category = FeatureCategory.HOME,
             hosts = setOf(AppTarget.DOUYIN),
         ),
         FeatureDefinition(
             id = "qq.chat_tools",
             title = "QQ 聊天辅助",
-            summary = "QQ 专属功能占位，等待对应 Hook 实现。",
+            summary = "QQ 聊天辅助。",
             category = FeatureCategory.CHAT,
             hosts = setOf(AppTarget.QQ),
         ),

@@ -31,10 +31,7 @@ internal fun ModuleSettingsHome(host: AppTarget, onOpenFeatures: () -> Unit) {
         item { SmallTitle(text = "${host.displayName} · DAuxiliary") }
         item {
             InjectedGroupCard {
-                BasicComponent(
-                    title = "已启动 ${enabled} 个功能",
-                    summary = "当前设置仅作用于 ${host.displayName}。",
-                )
+                BasicComponent(title = "已启动 ${enabled} 个功能")
                 ArrowPreference(
                     title = "功能设置",
                     summary = "按分类管理 ${host.displayName} 可用的模块功能。",
@@ -77,7 +74,7 @@ private fun FeaturePreference(host: AppTarget, feature: FeatureDefinition) {
     }
     SwitchPreference(
         title = feature.title,
-        summary = if (feature.implemented) feature.summary else "${feature.summary} · 当前为占位功能",
+        summary = feature.summary,
         checked = enabled,
         onCheckedChange = {
             enabled = it
@@ -92,8 +89,7 @@ internal fun ModuleLogPage(host: AppTarget, onBack: () -> Unit) {
         item { SmallTitle(text = "运行记录") }
         item {
             InjectedGroupCard {
-                BasicComponent(title = "宿主识别", summary = "已识别 ${host.displayName} (${host.packageName})")
-                BasicComponent(title = "模块加载", summary = "配置入口已初始化；真实 Hook 将按功能逐步接入。")
+                BasicComponent(title = "宿主识别", summary = host.displayName)
             }
         }
     }

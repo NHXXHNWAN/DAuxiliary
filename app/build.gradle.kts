@@ -15,8 +15,14 @@ android {
         // miuix-blur-android 0.9.4-rc01 declares minSdk 33.
         minSdk = 33
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = providers.gradleProperty("versionCode")
+            .orNull
+            ?.toIntOrNull()
+            ?: 1
+        versionName = providers.gradleProperty("versionName")
+            .orNull
+            ?.takeIf { it.isNotBlank() }
+            ?: "0.1.0"
     }
 
     // CI supplies a temporary test keystore through environment variables.

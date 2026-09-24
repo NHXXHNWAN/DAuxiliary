@@ -11,13 +11,10 @@ import com.dauxiliary.core.registry.AppTarget
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 
-/** Cross-app host management. Feature settings will be added below this registry. */
+/** Host application selection used by the module. */
 @Composable
 fun ManagePage() {
     val context = LocalContext.current
-    var enabledApps by rememberSaveable {
-        mutableStateOf(ConfigStore.enabledApplicationPackages(context))
-    }
     GroupedPage(title = "管理") {
         item { SmallTitle(text = "宿主应用") }
         item {
@@ -30,23 +27,13 @@ fun ManagePage() {
                     }
                     SwitchPreference(
                         title = target.displayName,
-                        summary = target.packageName,
                         checked = enabled,
                         onCheckedChange = { checked ->
                             enabled = checked
-                            val current = enabledApps.toMutableSet()
-                            if (checked) current += target.packageName else current -= target.packageName
-                            enabledApps = current
                             ConfigStore.setApplicationEnabled(context, target.packageName, checked)
                         },
                     )
                 }
-            }
-        }
-        item { SmallTitle(text = "功能") }
-        item {
-            GroupCard {
-                EnabledAppsCard(enabledApps)
             }
         }
     }
