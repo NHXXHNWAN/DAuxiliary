@@ -66,19 +66,13 @@ fun GroupedPage(
                     ) else Modifier,
                 ),
             ) {
-                if (navigationIcon == null) {
-                    TopAppBar(
-                        title = title,
-                        color = if (collapsed && !shaderSupported) surface else Color.Transparent,
-                        scrollBehavior = scrollBehavior,
-                    )
-                } else {
-                    SmallTopAppBar(
-                        title = title,
-                        color = if (collapsed && !shaderSupported) surface else Color.Transparent,
-                        navigationIcon = navigationIcon,
-                    )
-                }
+                SmallTopAppBar(
+                    title = title,
+                    titleColor = MiuixTheme.colorScheme.onSurface,
+                    color = if (collapsed && !shaderSupported) surface else Color.Transparent,
+                    navigationIcon = navigationIcon ?: {},
+                    scrollBehavior = scrollBehavior,
+                )
             }
         },
     ) { padding ->

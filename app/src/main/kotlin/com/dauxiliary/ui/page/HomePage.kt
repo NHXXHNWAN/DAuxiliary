@@ -20,10 +20,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.dauxiliary.BuildConfig
 import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.core.registry.AppTarget
@@ -34,7 +34,6 @@ import com.dauxiliary.ui.theme.isAppInDarkTheme
 import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
-import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.SmallTitle
@@ -43,12 +42,15 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /** Desktop overview with the module status and enabled host count. */
 @Composable
-fun HomePage(updateChannelIndex: Int) {
+fun HomePage(
+    updateChannelIndex: Int,
+    preservedUpdate: UpdateInfo?,
+    onUpdateResult: (UpdateInfo?) -> Unit,
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val updateChannel = UpdateChannel.entries[updateChannelIndex.coerceIn(0, UpdateChannel.entries.lastIndex)]
     var refresh by remember { mutableIntStateOf(0) }
-    var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var checkUpdates by remember { mutableIntStateOf(0) }
 
     DisposableEffect(lifecycleOwner) {
@@ -61,7 +63,7 @@ fun HomePage(updateChannelIndex: Int) {
 
     LaunchedEffect(checkUpdates, updateChannel) {
         while (true) {
-            updateInfo = UpdateChecker.check(BuildConfig.VERSION_NAME, updateChannel)
+            onUpdateResult(UpdateChecker.check(BuildConfig.VERSION_NAME, updateChannel))
             delay(30 * 60 * 1_000L)
         }
     }
@@ -97,14 +99,9 @@ fun HomePage(updateChannelIndex: Int) {
         }
         item(key = "module_status_card") {
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 cornerRadius = 20.dp,
-                colors = CardDefaults.defaultColors(
-                    color = cardColor,
-                    contentColor = titleColor,
-                ),
+                colors = CardDefaults.defaultColors(color = cardColor, contentColor = titleColor),
             ) {
                 Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
                     Text(
@@ -129,23 +126,20 @@ fun HomePage(updateChannelIndex: Int) {
                 }
             }
         }
-        updateInfo?.let { update ->
-            item(key = "available_update") {
+        preservedUpdate?.let { update ->
+            item(key = "available_update_${update.channel.name}") {
                 UpdateCard(
                     update = update,
                     darkTheme = darkTheme,
                     onUpdateClick = {
-                        val target = Uri.parse(update.downloadUrl)
-                        context.startActivity(Intent(Intent.ACTION_VIEW, target))
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(update.downloadUrl)))
                     },
                 )
             }
         }
         item(key = "enabled_hosts") {
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             ) {
                 BasicComponent(
                     title = "已启用宿主",
