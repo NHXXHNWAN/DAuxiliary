@@ -78,6 +78,7 @@ private fun MainNavigation(
         )
     }
     var homeUpdate by remember { mutableStateOf<UpdateInfo?>(null) }
+    var homeUpdateChecked by remember { mutableStateOf(false) }
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 3 })
     val scope = rememberCoroutineScope()
     val surfaceColor = MiuixTheme.colorScheme.surface
@@ -142,7 +143,11 @@ private fun MainNavigation(
                         0 -> HomePage(
                             updateChannelIndex = updateChannel,
                             preservedUpdate = homeUpdate,
-                            onUpdateResult = { homeUpdate = it },
+                            hasCheckedUpdate = homeUpdateChecked,
+                            onUpdateResult = {
+                                homeUpdate = it
+                                homeUpdateChecked = true
+                            },
                         )
                         1 -> ManagePage()
                         2 -> SettingsPage(
@@ -160,6 +165,7 @@ private fun MainNavigation(
                             onUpdateChannelChange = {
                                 updateChannel = it
                                 homeUpdate = null
+                                homeUpdateChecked = false
                                 ConfigStore.prefs(context).edit()
                                     .putInt(ConfigStore.KEY_UPDATE_CHANNEL, it)
                                     .apply()

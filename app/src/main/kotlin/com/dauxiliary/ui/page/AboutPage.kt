@@ -75,19 +75,23 @@ fun AboutPage(onBack: () -> Unit) {
         )
     }
     val cardColors = BlurDefaults.blurColors(blendColors = cardBlend)
+    val topBarBlurColors = BlurDefaults.blurColors(
+        blendColors = listOf(BlendColorEntry(surface.copy(alpha = 0.82f))),
+    )
 
     Scaffold(
         containerColor = surface,
         topBar = {
             Box(
                 Modifier.then(
-                    if (shaderSupported && collapsed) Modifier.textureBlur(
+                    if (shaderSupported) Modifier.drawBackdrop(
                         backdrop = pageBackdrop,
-                        shape = RectangleShape,
-                        blurRadius = 25f,
-                        colors = BlurDefaults.blurColors(
-                            blendColors = listOf(BlendColorEntry(surface.copy(alpha = 0.8f))),
-                        ),
+                        shape = { RectangleShape },
+                        effects = {
+                            // Miuix official Gaussian blur pipeline.
+                            blur(25f)
+                            blendColors(topBarBlurColors)
+                        },
                     ) else Modifier,
                 ),
             ) {
@@ -96,7 +100,7 @@ fun AboutPage(onBack: () -> Unit) {
                     titleColor = MiuixTheme.colorScheme.onSurface.copy(
                         alpha = ((scrollProgress - 0.35f) / 0.65f).coerceIn(0f, 1f),
                     ),
-                    color = if (collapsed && !shaderSupported) surface else Color.Transparent,
+                    color = if (shaderSupported) Color.Transparent else surface,
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(imageVector = MiuixIcons.Back, contentDescription = "返回")

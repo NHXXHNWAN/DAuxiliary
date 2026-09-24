@@ -1,6 +1,7 @@
 package com.dauxiliary.ui.page
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -27,12 +27,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import com.dauxiliary.BuildConfig
 import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.core.registry.AppTarget
@@ -56,33 +53,21 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 fun HomePage(
     updateChannelIndex: Int,
     preservedUpdate: UpdateInfo?,
+    hasCheckedUpdate: Boolean,
     onUpdateResult: (UpdateInfo?) -> Unit,
 ) {
     val context = LocalContext.current
     val updateScope = rememberCoroutineScope()
     var isDownloading by remember { mutableStateOf(false) }
-    val lifecycleOwner = LocalLifecycleOwner.current
     val updateChannel = UpdateChannel.entries[updateChannelIndex.coerceIn(0, UpdateChannel.entries.lastIndex)]
     var refresh by remember { mutableIntStateOf(0) }
-    var checkUpdates by remember { mutableIntStateOf(0) }
-    var isCheckingUpdate by remember { mutableStateOf(true) }
+    var isCheckingUpdate by remember(hasCheckedUpdate) { mutableStateOf(!hasCheckedUpdate) }
 
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) checkUpdates++
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    LaunchedEffect(checkUpdates, updateChannel) {
+    LaunchedEffect(updateChannel) {
+        if (hasCheckedUpdate) return@LaunchedEffect
         isCheckingUpdate = true
-        onUpdateResult(null)
-        while (true) {
-            onUpdateResult(UpdateChecker.check(BuildConfig.VERSION_NAME, updateChannel))
-            isCheckingUpdate = false
-            delay(30 * 60 * 1_000L)
-        }
+        onUpdateResult(UpdateChecker.check(BuildConfig.VERSION_NAME, updateChannel))
+        isCheckingUpdate = false
     }
 
     LaunchedEffect(Unit) {
@@ -157,28 +142,35 @@ fun HomePage(
         }
         item(key = "update_slot") {
             AnimatedVisibility(
-                visible = preservedUpdate != null || isCheckingUpdate,
+                visible = isCheckingUpdate || preservedUpdate != null,
                 enter = fadeIn(tween(350)) + expandVertically(tween(350)),
                 exit = fadeOut(tween(200)) + shrinkVertically(tween(200)),
             ) {
-                if (isCheckingUpdate && preservedUpdate == null) {
-                    UpdateLoadingCard(darkTheme)
-                }
-                preservedUpdate?.let { update ->
-                    UpdateCard(
-                        update = update,
-                        darkTheme = darkTheme,
-                        isDownloading = isDownloading,
-                        onUpdateClick = {
-                            if (!isDownloading) {
-                                isDownloading = true
-                                updateScope.launch {
-                                    ApkInstaller.downloadAndInstall(context, update.downloadUrl)
-                                    isDownloading = false
-                                }
-                            }
-                        },
-                    )
+                Crossfade(
+                    targetState = isCheckingUpdate,
+                    animationSpec = tween(300),
+                    label = "update-content",
+                ) { loading ->
+                    if (loading) {
+                        UpdateLoadingCard(darkTheme)
+                    } else {
+                        preservedUpdate?.let { update ->
+                            UpdateCard(
+                                update = update,
+                                darkTheme = darkTheme,
+                                isDownloading = isDownloading,
+                                onUpdateClick = {
+                                    if (!isDownloading) {
+                                        isDownloading = true
+                                        updateScope.launch {
+                                            ApkInstaller.downloadAndInstall(context, update.downloadUrl)
+                                            isDownloading = false
+                                        }
+                                    }
+                                },
+                            )
+                        }
+                    }
                 }
             }
         }

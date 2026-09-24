@@ -13,7 +13,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -45,31 +44,31 @@ fun GroupedPage(
     val surface = MiuixTheme.colorScheme.surface
     val shaderSupported = remember { isRuntimeShaderSupported() }
     val pageBackdrop = rememberLayerBackdrop { drawRect(surface); drawContent() }
-    val collapsed by remember {
-        derivedStateOf {
-            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
-        }
-    }
+    val topBarBlurColors = BlurDefaults.blurColors(
+        blendColors = listOf(BlendColorEntry(surface.copy(alpha = 0.82f))),
+    )
+    val collapsed = false // kept for scroll behavior compatibility
 
     Scaffold(
         containerColor = containerColor,
         topBar = {
             Box(
                 Modifier.then(
-                    if (shaderSupported && collapsed) Modifier.textureBlur(
+                    if (shaderSupported) Modifier.drawBackdrop(
                         backdrop = pageBackdrop,
-                        shape = RectangleShape,
-                        blurRadius = 25f,
-                        colors = BlurDefaults.blurColors(
-                            blendColors = listOf(BlendColorEntry(surface.copy(alpha = 0.8f))),
-                        ),
+                        shape = { RectangleShape },
+                        effects = {
+                            // Miuix official Gaussian blur pipeline.
+                            blur(25f)
+                            blendColors(topBarBlurColors)
+                        },
                     ) else Modifier,
                 ),
             ) {
                 SmallTopAppBar(
                     title = title,
                     titleColor = MiuixTheme.colorScheme.onSurface,
-                    color = surface.copy(alpha = if (collapsed) 0.84f else 0.68f),
+                    color = if (shaderSupported) Color.Transparent else surface,
                     navigationIcon = navigationIcon ?: {},
                     scrollBehavior = scrollBehavior,
                 )
