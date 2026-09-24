@@ -2,6 +2,7 @@ package com.dauxiliary.ui.page
 
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.calculateEndPadding
@@ -54,6 +55,7 @@ fun GroupedPage(
                     else Modifier,
                 ),
             overscrollEffect = null, // Never stack the theme factory with the modifier.
+            verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(
                 start = padding.calculateStartPadding(layoutDirection),
                 end = padding.calculateEndPadding(layoutDirection),

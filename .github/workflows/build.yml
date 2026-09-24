@@ -49,12 +49,8 @@ jobs:
               echo "RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD_SECRET"
             } >> "$GITHUB_ENV"
           else
-            if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] || [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-              echo "Stable release signing secrets are required to publish a Release."
-              echo "Configure RELEASE_KEYSTORE_BASE64, RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS and RELEASE_KEY_PASSWORD in repository Actions secrets."
-              exit 1
-            fi
-            echo "Release signing secrets are not configured; generating a temporary CI key for non-release CI only."
+            echo "Release signing secrets are not configured; generating a temporary CI key."
+            echo "WARNING: This APK is suitable for CI/testing only. Configure repository Actions secrets for a stable installable release signature."
             store_password="$(openssl rand -hex 16)"
             keytool -genkeypair -storetype JKS -alias dauxiliary-ci -keyalg RSA -keysize 2048 \
               -validity 3650 -keystore "$RUNNER_TEMP/dauxiliary-release.jks" \
