@@ -4,8 +4,10 @@ import android.content.Context
 import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.core.registry.AppTarget
 import com.dauxiliary.core.xposed.HostEntryHook
+import io.github.libxposed.api.XposedInterface
+import io.github.libxposed.api.XposedModuleInterface
 
-/** Central feature catalogue shared by all injected hosts. */
+/** Central feature catalogue and LibXposed API 102 dispatch point. */
 object FeatureRegistry {
     private val allFeatures = listOf(
         FeatureDefinition(
@@ -60,30 +62,28 @@ object FeatureRegistry {
         ),
     )
 
-    fun featuresFor(host: AppTarget): List<FeatureDefinition> =
-        allFeatures.filter { host in it.hosts }
+    fun featuresFor(host: AppTarget): List<FeatureDefinition> = allFeatures.filter { host in it.hosts }
 
     fun categoriesFor(host: AppTarget): List<FeatureCategory> =
         featuresFor(host).map { it.category }.distinct()
+
     fun isEnabled(context: Context, host: AppTarget, feature: FeatureDefinition): Boolean =
         ConfigStore.enabledFeatureIds(context, host).contains(feature.id)
 
     fun isEnabled(context: Context, host: AppTarget, featureId: String): Boolean =
         ConfigStore.enabledFeatureIds(context, host).contains(featureId)
 
-
     fun enabledCount(context: Context, host: AppTarget): Int =
         featuresFor(host).count { it.implemented && isEnabled(context, host, it) }
 
     fun dispatch(
-        context: Context?,
-        lpparam: de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam,
+        xposed: XposedInterface,
+        packageParam: XposedModuleInterface.PackageReadyParam,
         host: AppTarget,
     ) {
         if (ConfigStore.isFeatureEnabledInHookedProcess(host, "home.module_settings")) {
-            HostEntryHook.install(host)
+            HostEntryHook.install(xposed, host)
         }
-        // Other host feature hooks can be registered here without changing EntryHook.
     }
 
     fun setEnabled(context: Context, host: AppTarget, feature: FeatureDefinition, enabled: Boolean) {

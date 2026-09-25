@@ -88,11 +88,13 @@ private fun HostApplicationCard(context: Context, target: AppTarget) {
             Spacer(Modifier.size(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = target.displayName, color = MiuixTheme.colorScheme.onSurface)
-                Spacer(Modifier.size(4.dp))
-                Text(
-                    text = if (installed) "已识别，可在应用内打开模块入口" else "未安装，暂不可使用",
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                )
+                if (!installed) {
+                    Spacer(Modifier.size(4.dp))
+                    Text(
+                        text = "未安装，暂不可使用",
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                }
             }
             Switch(
                 checked = enabled,

@@ -17,6 +17,7 @@
         android:icon="@drawable/ic_launcher"
         android:roundIcon="@drawable/ic_launcher"
         android:label="@string/app_name"
+        android:description="@string/xposed_description"
         android:supportsRtl="true"
         android:theme="@style/Theme.DAuxiliary"
         tools:targetApi="31">
@@ -49,19 +50,11 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- Xposed module metadata -->
+        <!-- LibXposed reads module entry, scope and API level from META-INF/xposed. -->
         <meta-data
             android:name="xposedmodule"
-            android:value="true" />
-        <meta-data
-            android:name="xposeddescription"
-            android:value="@string/xposed_description" />
-        <meta-data
-            android:name="xposedminversion"
-            android:value="82" />
-        <meta-data
-            android:name="xposedscope"
-            android:resource="@array/xposed_scope" />
+            android:value="true"
+            tools:replace="android:value" />
     </application>
 
 </manifest>

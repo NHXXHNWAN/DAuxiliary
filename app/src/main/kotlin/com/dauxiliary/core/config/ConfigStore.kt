@@ -2,11 +2,12 @@ package com.dauxiliary.core.config
 
 import android.content.Context
 import com.dauxiliary.core.registry.AppTarget
-import de.robv.android.xposed.XSharedPreferences
 
 /** Shared module configuration and host heartbeat access. */
 object ConfigStore {
-    private const val PREFS_FILE = "daux_config"
+    const val REMOTE_PREFS_GROUP = "daux_config"
+    private const val PREFS_FILE = REMOTE_PREFS_GROUP
+
     const val KEY_FLOATING_NAVIGATION_BAR_STYLE = "floating_navigation_bar_style"
     const val KEY_COLOR_MODE = "color_mode"
     const val KEY_ENABLED_APPLICATIONS = "enabled_applications"
@@ -21,6 +22,15 @@ object ConfigStore {
     private val DEFAULT_ENABLED_APPLICATIONS = setOf("com.ss.android.ugc.aweme")
     private val DEFAULT_ENABLED_FEATURES = setOf("home.module_settings")
 
+    @Volatile
+    private var remotePreferences: android.content.SharedPreferences? = null
+
+    fun defaultEnabledApplications(): Set<String> = DEFAULT_ENABLED_APPLICATIONS
+
+    fun attachRemotePreferences(preferences: android.content.SharedPreferences) {
+        remotePreferences = preferences
+    }
+
     fun enabledApplicationPackages(context: Context): Set<String> =
         prefs(context).getStringSet(KEY_ENABLED_APPLICATIONS, DEFAULT_ENABLED_APPLICATIONS).orEmpty()
 
@@ -30,7 +40,7 @@ object ConfigStore {
         if (context.packageName == MODULE_PACKAGE) {
             prefs(context).getStringSet(featureKey(host), DEFAULT_ENABLED_FEATURES).orEmpty()
         } else {
-            hookedPreferences()?.getStringSet(featureKey(host), DEFAULT_ENABLED_FEATURES).orEmpty()
+            remotePreferences?.getStringSet(featureKey(host), DEFAULT_ENABLED_FEATURES).orEmpty()
         }
 
     fun setFeatureEnabled(context: Context, host: AppTarget, featureId: String, enabled: Boolean) {
@@ -40,8 +50,12 @@ object ConfigStore {
     }
 
     fun prefs(context: Context) =
-        context.createPackageContext(MODULE_PACKAGE, Context.CONTEXT_IGNORE_SECURITY)
-            .getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
+        if (context.packageName == MODULE_PACKAGE) {
+            context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
+        } else {
+            context.createPackageContext(MODULE_PACKAGE, Context.CONTEXT_IGNORE_SECURITY)
+                .getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
+        }
 
     /** Host process reports through the module-owned provider; no local flag is fabricated. */
     fun recordHostLoaded(context: Context, host: AppTarget) {
@@ -70,32 +84,27 @@ object ConfigStore {
         enabledApplicationPackages(context).contains(packageName)
 
     fun readFromHookedProcess(key: String, default: Boolean): Boolean =
-        hookedPreferences()?.getBoolean(key, default) ?: default
+        remotePreferences?.getBoolean(key, default) ?: default
 
     fun readEnabledApplicationCount(): Int =
-        hookedPreferences()?.getStringSet(KEY_ENABLED_APPLICATIONS, emptySet())?.size ?: 0
+        remotePreferences?.getStringSet(KEY_ENABLED_APPLICATIONS, emptySet())?.size ?: 0
 
     fun isApplicationEnabledInHookedProcess(packageName: String): Boolean =
-        hookedPreferences()?.getStringSet(KEY_ENABLED_APPLICATIONS, DEFAULT_ENABLED_APPLICATIONS)
+        remotePreferences?.getStringSet(KEY_ENABLED_APPLICATIONS, DEFAULT_ENABLED_APPLICATIONS)
             ?.contains(packageName) == true
 
     fun isFeatureEnabledInHookedProcess(host: AppTarget, featureId: String): Boolean =
-        hookedPreferences()?.getStringSet(featureKey(host), DEFAULT_ENABLED_FEATURES)
+        remotePreferences?.getStringSet(featureKey(host), DEFAULT_ENABLED_FEATURES)
             ?.contains(featureId) == true
 
     private fun featureKey(host: AppTarget) = KEY_HOST_FEATURE_PREFIX + host.name.lowercase()
     private fun lastSeenKey(host: AppTarget) = KEY_HOST_LAST_SEEN_PREFIX + host.name.lowercase()
 
-    @Volatile
-    private var cached: XSharedPreferences? = null
-
-    private fun hookedPreferences(): XSharedPreferences? {
-        cached?.reload()
-        return cached ?: runCatching {
-            XSharedPreferences(MODULE_PACKAGE, PREFS_FILE).apply {
-                makeWorldReadable()
-                reload()
-            }.also { cached = it }
-        }.getOrNull()
-    }
+    /**
+     * Modern LibXposed modules must use remote preferences instead of legacy
+     * XSharedPreferences. The module app remains the single source of truth;
+     * hooked processes receive a read-only proxy through the module interface.
+     */
+    fun readRemotePreferences(xposed: io.github.libxposed.api.XposedInterface): android.content.SharedPreferences =
+        xposed.getRemotePreferences(PREFS_FILE)
 }

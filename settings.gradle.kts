@@ -11,8 +11,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        // Xposed API 82 is hosted in Appodeal's public Maven repository.
-        maven("https://artifactory.appodeal.com/appodeal-public/")
+
     }
 }
 

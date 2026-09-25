@@ -1,16 +1,11 @@
 package com.dauxiliary.ui.page
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -46,6 +41,7 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /** Desktop overview with the module status and enabled host count. */
@@ -61,13 +57,20 @@ fun HomePage(
     var isDownloading by remember { mutableStateOf(false) }
     val updateChannel = UpdateChannel.entries[updateChannelIndex.coerceIn(0, UpdateChannel.entries.lastIndex)]
     var refresh by remember { mutableIntStateOf(0) }
-    var isCheckingUpdate by remember(hasCheckedUpdate) { mutableStateOf(!hasCheckedUpdate) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    val pullToRefreshState = rememberPullToRefreshState()
 
-    LaunchedEffect(updateChannel) {
-        if (hasCheckedUpdate) return@LaunchedEffect
-        isCheckingUpdate = true
-        onUpdateResult(UpdateChecker.check(BuildConfig.VERSION_NAME, updateChannel))
-        isCheckingUpdate = false
+    fun checkForUpdate() {
+        if (isRefreshing) return
+        isRefreshing = true
+        updateScope.launch {
+            onUpdateResult(UpdateChecker.check(BuildConfig.VERSION_NAME, updateChannel))
+            isRefreshing = false
+        }
+    }
+
+    LaunchedEffect(updateChannel, hasCheckedUpdate) {
+        if (!hasCheckedUpdate) checkForUpdate()
     }
 
     LaunchedEffect(Unit) {
@@ -95,7 +98,12 @@ fun HomePage(
     val titleColor = if (darkTheme) MiuixTheme.colorScheme.onSurface else Color(0xFF1F2421)
     val summaryColor = if (darkTheme) accentColor else Color(0xFF53605A)
 
-    GroupedPage(title = "主页") {
+    GroupedPage(
+        title = "主页",
+        isRefreshing = isRefreshing,
+        onRefresh = ::checkForUpdate,
+        pullToRefreshState = pullToRefreshState,
+    ) {
         item(key = "module_status_title") {
             SmallTitle(text = "DAuxiliary")
         }
@@ -142,34 +150,24 @@ fun HomePage(
         }
         item(key = "update_slot") {
             AnimatedVisibility(
-                visible = isCheckingUpdate || preservedUpdate != null,
+                visible = preservedUpdate != null,
                 enter = fadeIn(tween(350)) + expandVertically(tween(350)),
                 exit = fadeOut(tween(200)) + shrinkVertically(tween(200)),
             ) {
-                Crossfade(
-                    targetState = isCheckingUpdate,
-                    animationSpec = tween(300),
-                    label = "update-content",
-                ) { loading ->
-                    if (loading) {
-                        UpdateLoadingCard(darkTheme)
-                    } else {
-                        preservedUpdate?.let { update ->
-                            UpdateCard(
-                                update = update,
-                                isDownloading = isDownloading,
-                                onUpdateClick = {
-                                    if (!isDownloading) {
-                                        isDownloading = true
-                                        updateScope.launch {
-                                            ApkInstaller.downloadAndInstall(context, update.downloadUrl)
-                                            isDownloading = false
-                                        }
-                                    }
-                                },
-                            )
-                        }
-                    }
+                preservedUpdate?.let { update ->
+                    UpdateCard(
+                        update = update,
+                        isDownloading = isDownloading,
+                        onUpdateClick = {
+                            if (!isDownloading) {
+                                isDownloading = true
+                                updateScope.launch {
+                                    ApkInstaller.downloadAndInstall(context, update.downloadUrl)
+                                    isDownloading = false
+                                }
+                            }
+                        },
+                    )
                 }
             }
         }

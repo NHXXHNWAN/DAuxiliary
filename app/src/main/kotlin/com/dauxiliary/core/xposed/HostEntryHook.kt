@@ -8,7 +8,6 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import java.util.Locale
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -17,33 +16,33 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.unit.dp
 import com.dauxiliary.core.registry.AppTarget
 import com.dauxiliary.ui.injected.InjectedModuleSettings
-import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedHelpers
+import io.github.libxposed.api.XposedInterface
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import java.util.Locale
 
-/** Generic injected-host entry. The button only opens settings; feature statistics stay in settings home. */
+/** Module settings entry implemented with the modern LibXposed interceptor API. */
 object HostEntryHook {
     private const val OVERLAY_TAG_PREFIX = "dauxiliary_host_entry_"
     private val installedTargets = mutableSetOf<AppTarget>()
 
-    fun install(target: AppTarget) {
+    fun install(xposed: XposedInterface, target: AppTarget) {
         if (!installedTargets.add(target)) return
-        XposedHelpers.findAndHookMethod(
-            Activity::class.java,
-            "onResume",
-            object : XC_MethodHook() {
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    val activity = param.thisObject as? Activity ?: return
+        val onResume = Activity::class.java.getDeclaredMethod("onResume")
+        xposed.hook(onResume)
+            .setId("${target.name.lowercase(Locale.ROOT)}.activity.on_resume")
+            .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+            .intercept { chain ->
+                val result = chain.proceed()
+                (chain.thisObject as? Activity)?.let { activity ->
                     activity.runOnUiThread { installOverlay(activity, target) }
                 }
-            },
-        )
+                result
+            }
     }
 
     private fun installOverlay(activity: Activity, target: AppTarget) {
@@ -53,7 +52,6 @@ object HostEntryHook {
         val composeView = ComposeView(activity).apply {
             this.tag = tag
             setBackgroundColor(Color.TRANSPARENT)
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             setContent { MiuixTheme { HostEntryButton(activity, target) } }
         }
         val params = FrameLayout.LayoutParams(
@@ -91,7 +89,6 @@ private object HostSettingsDialog {
     fun show(activity: Activity, target: AppTarget) {
         val dialog = Dialog(activity)
         val view = ComposeView(activity).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             setContent { MiuixTheme { InjectedModuleSettings(target) } }
         }
         dialog.setContentView(view)

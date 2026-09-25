@@ -35,6 +35,9 @@ fun GroupedPage(
     title: String,
     navigationIcon: (@Composable () -> Unit)? = null,
     containerColor: androidx.compose.ui.graphics.Color = MiuixTheme.colorScheme.surface,
+    isRefreshing: Boolean = false,
+    onRefresh: (() -> Unit)? = null,
+    pullToRefreshState: top.yukonga.miuix.kmp.basic.PullToRefreshState? = null,
     content: LazyListScope.() -> Unit,
 ) {
     val scrollBehavior = MiuixScrollBehavior()
@@ -76,7 +79,8 @@ fun GroupedPage(
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().layerBackdrop(pageBackdrop)) {
-            LazyColumn(
+            val listContent: @Composable () -> Unit = {
+                LazyColumn(
                 state = listState,
                 // Official order: boundary bounce wraps the app-bar scroll connection.
                 // Explicit modifier also supports pages shorter than the viewport.
@@ -96,7 +100,19 @@ fun GroupedPage(
                     bottom = maxOf(navigationBottom, padding.calculateBottomPadding()) + 24.dp,
                 ),
                 content = content,
-            )
+                )
+            }
+            if (onRefresh != null && pullToRefreshState != null) {
+                PullToRefresh(
+                    modifier = Modifier.fillMaxSize(),
+                    isRefreshing = isRefreshing,
+                    onRefresh = onRefresh,
+                    pullToRefreshState = pullToRefreshState,
+                    refreshTexts = listOf("下拉刷新", "松开刷新", "正在刷新", "刷新成功"),
+                ) { listContent() }
+            } else {
+                listContent()
+            }
         }
     }
 }
