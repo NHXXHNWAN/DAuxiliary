@@ -2,6 +2,7 @@ package com.dauxiliary.core.xposed
 
 import android.app.Activity
 import android.app.Dialog
+import android.app.Instrumentation
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
@@ -30,34 +31,29 @@ object HostEntryHook {
             if (!installedTargets.add(target)) return
         }
         runCatching {
-            hookActivityMethod(xposed, target, "onCreate", Bundle::class.java)
-            hookActivityMethod(xposed, target, "onResume")
-            hookActivityMethod(xposed, target, "onWindowFocusChanged", Boolean::class.javaPrimitiveType!!)
+            val method = Instrumentation::class.java.getDeclaredMethod(
+                "callActivityOnResume",
+                Activity::class.java,
+            )
+            xposed.hook(method)
+                .setId("${target.name.lowercase(Locale.ROOT)}.instrumentation.call_activity_on_resume")
+                .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                .intercept { chain ->
+                    val result = chain.proceed()
+                    val activity = chain.args.firstOrNull() as? Activity
+                    if (activity != null) {
+                        activity.runOnUiThread {
+                            activity.window?.decorView?.postDelayed(
+                                { installOverlay(activity, target) },
+                                120L,
+                            )
+                        }
+                    }
+                    result
+                }
         }.onFailure { error ->
             Log.e("DAuxiliary", "Failed to install ${target.displayName} entry hook", error)
         }
-    }
-
-    private fun hookActivityMethod(
-        xposed: XposedInterface,
-        target: AppTarget,
-        methodName: String,
-        vararg parameterTypes: Class<*>,
-    ) {
-        val method = Activity::class.java.getDeclaredMethod(methodName, *parameterTypes)
-        xposed.hook(method)
-            .setId("${target.name.lowercase(Locale.ROOT)}.activity.$methodName")
-            .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
-            .intercept { chain ->
-                val result = chain.proceed()
-                val activity = chain.thisObject as? Activity
-                if (activity != null && (methodName != "onWindowFocusChanged" || chain.args.firstOrNull() == true)) {
-                    activity.runOnUiThread {
-                        activity.window?.decorView?.post { installOverlay(activity, target) }
-                    }
-                }
-                result
-            }
     }
 
     private fun installOverlay(activity: Activity, target: AppTarget) {

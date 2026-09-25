@@ -15,11 +15,12 @@ object ConfigStore {
     const val KEY_DYNAMIC_BACKGROUND = "dynamic_background"
     const val KEY_FULLSCREEN_BACKGROUND = "fullscreen_background"
     const val KEY_UPDATE_CHANNEL = "update_channel"
+    const val KEY_APPLICATION_SELECTION_INITIALIZED = "application_selection_initialized"
     private const val KEY_HOST_FEATURE_PREFIX = "enabled_features_"
     private const val KEY_HOST_LAST_SEEN_PREFIX = "host_last_seen_"
     private const val HOST_ACTIVE_WINDOW_MS = 5 * 60 * 1000L
     private const val MODULE_PACKAGE = "com.dauxiliary"
-    private val DEFAULT_ENABLED_APPLICATIONS = setOf("com.ss.android.ugc.aweme")
+    private val DEFAULT_ENABLED_APPLICATIONS = AppTarget.entries.mapTo(linkedSetOf()) { it.packageName }
     private val DEFAULT_ENABLED_FEATURES = setOf("home.module_settings")
 
     @Volatile
@@ -31,8 +32,26 @@ object ConfigStore {
         remotePreferences = preferences
     }
 
-    fun enabledApplicationPackages(context: Context): Set<String> =
-        prefs(context).getStringSet(KEY_ENABLED_APPLICATIONS, DEFAULT_ENABLED_APPLICATIONS).orEmpty()
+    fun ensureApplicationDefaults(context: Context) {
+        if (context.packageName != MODULE_PACKAGE) return
+        val preferences = prefs(context)
+        if (!preferences.getBoolean(KEY_APPLICATION_SELECTION_INITIALIZED, false)) {
+            preferences.edit()
+                .putStringSet(KEY_ENABLED_APPLICATIONS, DEFAULT_ENABLED_APPLICATIONS)
+                .putBoolean(KEY_APPLICATION_SELECTION_INITIALIZED, true)
+                .apply()
+        }
+    }
+
+    fun enabledApplicationPackages(context: Context): Set<String> {
+        val preferences = prefs(context)
+        if (context.packageName == MODULE_PACKAGE &&
+            !preferences.getBoolean(KEY_APPLICATION_SELECTION_INITIALIZED, false)
+        ) {
+            return DEFAULT_ENABLED_APPLICATIONS
+        }
+        return preferences.getStringSet(KEY_ENABLED_APPLICATIONS, DEFAULT_ENABLED_APPLICATIONS).orEmpty()
+    }
 
     fun enabledApplicationCount(context: Context): Int = enabledApplicationPackages(context).size
 
@@ -77,7 +96,10 @@ object ConfigStore {
     fun setApplicationEnabled(context: Context, packageName: String, enabled: Boolean) {
         val current = enabledApplicationPackages(context).toMutableSet()
         if (enabled) current += packageName else current -= packageName
-        prefs(context).edit().putStringSet(KEY_ENABLED_APPLICATIONS, current).apply()
+        prefs(context).edit()
+            .putStringSet(KEY_ENABLED_APPLICATIONS, current)
+            .putBoolean(KEY_APPLICATION_SELECTION_INITIALIZED, true)
+            .apply()
     }
 
     fun isApplicationEnabled(context: Context, packageName: String): Boolean =

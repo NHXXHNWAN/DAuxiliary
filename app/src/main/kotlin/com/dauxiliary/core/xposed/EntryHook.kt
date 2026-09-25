@@ -24,16 +24,25 @@ class EntryHook : XposedModule() {
         val remotePreferences = getRemotePreferences(ConfigStore.REMOTE_PREFS_GROUP)
         ConfigStore.attachRemotePreferences(remotePreferences)
 
-        log("Package ready: ${target.displayName} (${param.packageName})")
-        if (!remotePreferences
+        val selectionInitialized = remotePreferences.getBoolean(
+            ConfigStore.KEY_APPLICATION_SELECTION_INITIALIZED,
+            false,
+        )
+        val enabledApplications = if (selectionInitialized) {
+            remotePreferences
                 .getStringSet(ConfigStore.KEY_ENABLED_APPLICATIONS, ConfigStore.defaultEnabledApplications())
                 .orEmpty()
-                .contains(target.packageName)
-        ) {
+        } else {
+            ConfigStore.defaultEnabledApplications()
+        }
+        log("Package ready: ${target.displayName} (${param.packageName}), selectionInitialized=$selectionInitialized, enabled=${target.packageName in enabledApplications}")
+        if (target.packageName !in enabledApplications) {
+            log("Skip ${target.displayName}: host is disabled in module settings")
             return
         }
 
         FeatureRegistry.dispatch(this, param, target)
+        log("Feature dispatch completed for ${target.displayName}")
     }
 
     override fun onHotReloading(param: XposedModuleInterface.HotReloadingParam): Boolean {

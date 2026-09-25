@@ -81,7 +81,8 @@ object FeatureRegistry {
         packageParam: XposedModuleInterface.PackageReadyParam,
         host: AppTarget,
     ) {
-        if (ConfigStore.isFeatureEnabledInHookedProcess(host, "home.module_settings")) {
+        val entryEnabled = ConfigStore.isFeatureEnabledInHookedProcess(host, "home.module_settings")
+        if (entryEnabled) {
             HostEntryHook.install(xposed, host)
         }
     }
