@@ -93,14 +93,14 @@ fun AboutPage(onBack: () -> Unit) {
                 bottomContent = {
                     Box(
                             Modifier
-                                .matchParentSize()
+                                .fillMaxSize()
                                 .graphicsLayer {
                                     alpha = (-topAppBarScrollBehavior.state.contentOffset /
                                         with(density) { 48.dp.toPx() }).coerceIn(0f, 1f)
                                 }
                                 .progressiveTextureBlur(
                                     backdrop = pageBackdrop,
-                                    shape = { RectangleShape },
+                                    shape = RectangleShape,
                                     gradient = ProgressiveBlur.Top.copy(curve = 2.2f),
                                     blurRadius = 10f,
                                     colors = topBarBlurColors,

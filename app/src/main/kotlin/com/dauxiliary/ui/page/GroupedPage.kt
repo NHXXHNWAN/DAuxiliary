@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -64,14 +65,14 @@ fun GroupedPage(
                 bottomContent = {
                     Box(
                             Modifier
-                                .matchParentSize()
+                                .fillMaxSize()
                                 .graphicsLayer {
                                     alpha = (-scrollBehavior.state.contentOffset / with(density) { 48.dp.toPx() })
                                         .coerceIn(0f, 1f)
                                 }
                                 .progressiveTextureBlur(
                                     backdrop = pageBackdrop,
-                                    shape = { RectangleShape },
+                                    shape = RectangleShape,
                                     gradient = ProgressiveBlur.Top.copy(curve = 2.2f),
                                     blurRadius = 10f,
                                      colors = topBarBlurColors,
