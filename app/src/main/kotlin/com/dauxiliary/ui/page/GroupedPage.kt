@@ -50,7 +50,6 @@ fun GroupedPage(
     val topBarBlurColors = BlurDefaults.blurColors(
         blendColors = listOf(BlendColorEntry(surface.copy(alpha = 0.82f))),
     )
-    val collapsed = false // kept for scroll behavior compatibility
 
     Scaffold(
         containerColor = containerColor,
@@ -61,16 +60,22 @@ fun GroupedPage(
                         backdrop = pageBackdrop,
                         shape = { RectangleShape },
                         effects = {
-                            // Miuix official Gaussian blur pipeline.
+                            // Keep the progressive app bar translucent while the list moves below it.
                             blur(25f)
                             blendColors(topBarBlurColors)
                         },
                     ) else Modifier,
                 ),
             ) {
-                SmallTopAppBar(
+                // Miuix's TopAppBar is the official progressive app bar: it expands to a
+                // large title at the top and progressively collapses as the list scrolls.
+                // Unlike the previous pinned SmallTopAppBar, its scroll range also leaves the
+                // pull-to-refresh indicator visible instead of putting it behind the bar.
+                TopAppBar(
                     title = title,
+                    largeTitle = title,
                     titleColor = MiuixTheme.colorScheme.onSurface,
+                    largeTitleColor = MiuixTheme.colorScheme.onSurface,
                     color = if (shaderSupported) Color.Transparent else surface,
                     navigationIcon = navigationIcon ?: {},
                     scrollBehavior = scrollBehavior,

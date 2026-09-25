@@ -6,11 +6,16 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -20,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -35,13 +41,12 @@ import com.dauxiliary.core.update.UpdateInfo
 import com.dauxiliary.ui.theme.isAppInDarkTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.basic.BasicComponent
-import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
+import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /** Desktop overview with the module status and enabled host count. */
@@ -55,6 +60,7 @@ fun HomePage(
     val context = LocalContext.current
     val updateScope = rememberCoroutineScope()
     var isDownloading by remember { mutableStateOf(false) }
+    var showReleaseNotes by remember { mutableStateOf(false) }
     val updateChannel = UpdateChannel.entries[updateChannelIndex.coerceIn(0, UpdateChannel.entries.lastIndex)]
     var refresh by remember { mutableIntStateOf(0) }
     var isRefreshing by remember { mutableStateOf(false) }
@@ -80,7 +86,6 @@ fun HomePage(
         }
     }
 
-    val enabledHosts = ConfigStore.enabledApplicationPackages(context).size
     val moduleActive = remember(refresh) {
         AppTarget.entries.any { ConfigStore.isHostActive(context, it) }
     }
@@ -108,44 +113,50 @@ fun HomePage(
             SmallTitle(text = "DAuxiliary")
         }
         item(key = "module_status_card") {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                cornerRadius = 20.dp,
-                colors = CardDefaults.defaultColors(color = cardColor, contentColor = titleColor),
-            ) {
-                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
-                    Text(
-                        text = if (moduleActive) "模块已激活" else "模块未激活",
-                        color = titleColor,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = if (moduleActive) "DAuxiliary 正在为已启用的宿主提供服务" else "DAuxiliary 尚未在已启用的宿主中加载",
-                        color = summaryColor,
-                        fontSize = 14.sp,
-                    )
-                    Spacer(Modifier.height(18.dp))
-                    Text(
-                        text = if (moduleActive) "已激活" else "未激活",
-                        color = accentColor,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-            }
-        }
-        item(key = "enabled_hosts") {
-            Card(
+            Box(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             ) {
-                BasicComponent(
-                    title = "已启用宿主",
-                    summary = enabledHosts.toString(),
-                    titleColor = BasicComponentDefaults.titleColor(MiuixTheme.colorScheme.onSurfaceVariantSummary),
-                    summaryColor = BasicComponentDefaults.summaryColor(MiuixTheme.colorScheme.onSurface),
+                // Offset backplate and soft elevation create a lightweight 3D card using Miuix Card.
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(end = 5.dp, bottom = 5.dp)
+                        .offset(y = 5.dp)
+                        .shadow(10.dp, RoundedCornerShape(22.dp), clip = false)
+                        .background(
+                            color = if (moduleActive) accentColor.copy(alpha = 0.7f) else accentColor.copy(alpha = 0.55f),
+                            shape = RoundedCornerShape(22.dp),
+                        ),
                 )
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(end = 5.dp, bottom = 5.dp),
+                    cornerRadius = 20.dp,
+                    colors = CardDefaults.defaultColors(color = cardColor, contentColor = titleColor),
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
+                        Text(
+                            text = if (moduleActive) "模块已激活" else "模块未激活",
+                            color = titleColor,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = if (moduleActive) "DAuxiliary 正在为已启用的宿主提供服务" else "DAuxiliary 尚未在已启用的宿主中加载",
+                            color = summaryColor,
+                            fontSize = 14.sp,
+                        )
+                        Spacer(Modifier.height(18.dp))
+                        Text(
+                            text = if (moduleActive) "已激活" else "未激活",
+                            color = accentColor,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
             }
         }
         item(key = "update_slot") {
@@ -167,9 +178,26 @@ fun HomePage(
                                 }
                             }
                         },
+                        onLongClick = { showReleaseNotes = true },
                     )
                 }
             }
+        }
+    }
+
+    preservedUpdate?.let { update ->
+        OverlayBottomSheet(
+            show = showReleaseNotes,
+            title = "${update.channel.label} ${update.latestVersion} 更新内容",
+            onDismissRequest = { showReleaseNotes = false },
+        ) {
+            Text(
+                text = update.releaseNotes,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                color = MiuixTheme.colorScheme.onSurface,
+                fontSize = 14.sp,
+            )
+            Spacer(Modifier.height(12.dp))
         }
     }
 }
