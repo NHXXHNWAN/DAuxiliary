@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.*
@@ -46,9 +47,11 @@ fun GroupedPage(
     val surface = MiuixTheme.colorScheme.surface
     val shaderSupported = remember { isRuntimeShaderSupported() }
     val pageBackdrop = rememberLayerBackdrop { drawRect(surface); drawContent() }
+    val density = LocalDensity.current
     val topBarBlurColors = BlurDefaults.blurColors(
-        blendColors = listOf(BlendColorEntry(surface.copy(alpha = 0.82f))),
+        blendColors = listOf(BlendColorEntry(surface.copy(alpha = 0.3f))),
     )
+    // Miuix v0.9.4 official progressive blur: progressiveTextureBlur + ProgressiveBlur.Top.
 
     Scaffold(
         containerColor = containerColor,
@@ -56,23 +59,30 @@ fun GroupedPage(
             // Do not wrap TopAppBar in another measured app-bar container. TopAppBar itself is
             // the only top bar, and its MiuixScrollBehavior owns the progressive title layout.
             TopAppBar(
-                modifier = if (shaderSupported) {
-                    Modifier.drawBackdrop(
-                        backdrop = pageBackdrop,
-                        shape = { RectangleShape },
-                        effects = {
-                            blur(25f)
-                            blendColors(topBarBlurColors)
-                        },
-                    )
-                } else {
-                    Modifier
-                },
+                modifier = Modifier,
+                // Progressive blur remains clear at the expanded end and appears as the bar collapses.
+                bottomContent = {
+                    Box(
+                            Modifier
+                                .matchParentSize()
+                                .graphicsLayer {
+                                    alpha = (-scrollBehavior.state.contentOffset / with(density) { 48.dp.toPx() })
+                                        .coerceIn(0f, 1f)
+                                }
+                                .progressiveTextureBlur(
+                                    backdrop = pageBackdrop,
+                                    shape = { RectangleShape },
+                                    gradient = ProgressiveBlur.Top.copy(curve = 2.2f),
+                                    blurRadius = 10f,
+                                     colors = topBarBlurColors,
+                                 ),
+                         )
+                 },
                 title = title,
                 largeTitle = title,
                 titleColor = MiuixTheme.colorScheme.onSurface,
                 largeTitleColor = MiuixTheme.colorScheme.onSurface,
-                color = if (shaderSupported) Color.Transparent else surface,
+                color = Color.Transparent,
                 navigationIcon = navigationIcon ?: {},
                 scrollBehavior = scrollBehavior,
             )
