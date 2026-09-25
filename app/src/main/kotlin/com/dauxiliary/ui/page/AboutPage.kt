@@ -93,7 +93,7 @@ fun AboutPage(onBack: () -> Unit) {
                 bottomContent = {
                     Box(
                             Modifier
-                                .fillMaxSize()
+                                .fillMaxWidth()
                                 .graphicsLayer {
                                     alpha = (-topAppBarScrollBehavior.state.contentOffset /
                                         with(density) { 48.dp.toPx() }).coerceIn(0f, 1f)

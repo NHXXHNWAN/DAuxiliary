@@ -65,7 +65,7 @@ fun GroupedPage(
                 bottomContent = {
                     Box(
                             Modifier
-                                .fillMaxSize()
+                                .fillMaxWidth()
                                 .graphicsLayer {
                                     alpha = (-scrollBehavior.state.contentOffset / with(density) { 48.dp.toPx() })
                                         .coerceIn(0f, 1f)
