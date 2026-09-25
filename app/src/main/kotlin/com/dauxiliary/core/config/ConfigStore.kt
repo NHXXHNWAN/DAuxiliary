@@ -19,6 +19,7 @@ object ConfigStore {
     private const val HOST_ACTIVE_WINDOW_MS = 5 * 60 * 1000L
     private const val MODULE_PACKAGE = "com.dauxiliary"
     private val DEFAULT_ENABLED_APPLICATIONS = setOf("com.ss.android.ugc.aweme")
+    private val DEFAULT_ENABLED_FEATURES = setOf("home.module_settings")
 
     fun enabledApplicationPackages(context: Context): Set<String> =
         prefs(context).getStringSet(KEY_ENABLED_APPLICATIONS, DEFAULT_ENABLED_APPLICATIONS).orEmpty()
@@ -27,9 +28,9 @@ object ConfigStore {
 
     fun enabledFeatureIds(context: Context, host: AppTarget): Set<String> =
         if (context.packageName == MODULE_PACKAGE) {
-            prefs(context).getStringSet(featureKey(host), emptySet()).orEmpty()
+            prefs(context).getStringSet(featureKey(host), DEFAULT_ENABLED_FEATURES).orEmpty()
         } else {
-            hookedPreferences()?.getStringSet(featureKey(host), emptySet()).orEmpty()
+            hookedPreferences()?.getStringSet(featureKey(host), DEFAULT_ENABLED_FEATURES).orEmpty()
         }
 
     fun setFeatureEnabled(context: Context, host: AppTarget, featureId: String, enabled: Boolean) {
@@ -77,6 +78,10 @@ object ConfigStore {
     fun isApplicationEnabledInHookedProcess(packageName: String): Boolean =
         hookedPreferences()?.getStringSet(KEY_ENABLED_APPLICATIONS, DEFAULT_ENABLED_APPLICATIONS)
             ?.contains(packageName) == true
+
+    fun isFeatureEnabledInHookedProcess(host: AppTarget, featureId: String): Boolean =
+        hookedPreferences()?.getStringSet(featureKey(host), DEFAULT_ENABLED_FEATURES)
+            ?.contains(featureId) == true
 
     private fun featureKey(host: AppTarget) = KEY_HOST_FEATURE_PREFIX + host.name.lowercase()
     private fun lastSeenKey(host: AppTarget) = KEY_HOST_LAST_SEEN_PREFIX + host.name.lowercase()

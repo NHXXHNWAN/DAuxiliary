@@ -157,7 +157,6 @@ fun HomePage(
                         preservedUpdate?.let { update ->
                             UpdateCard(
                                 update = update,
-                                darkTheme = darkTheme,
                                 isDownloading = isDownloading,
                                 onUpdateClick = {
                                     if (!isDownloading) {

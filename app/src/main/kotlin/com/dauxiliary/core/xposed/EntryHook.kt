@@ -5,6 +5,7 @@ import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import com.dauxiliary.core.config.ConfigStore
+import com.dauxiliary.core.feature.FeatureRegistry
 import com.dauxiliary.core.registry.AppTarget
 
 /**
@@ -22,17 +23,14 @@ class EntryHook : IXposedHookLoadPackage {
 
         log("Loaded into ${target.displayName} (${lpparam.packageName}, pid=${android.os.Process.myPid()})")
 
-        HostEntryHook.install(target)
-        runCatching {
+        val hostContext = runCatching {
             val activityThread = XposedHelpers.findClass("android.app.ActivityThread", null)
             XposedHelpers.callStaticMethod(activityThread, "currentApplication") as? android.content.Context
-        }.getOrNull()?.let { context ->
-            ConfigStore.recordHostLoaded(context, target)
-        }
+        }.getOrNull()
+        hostContext?.let { ConfigStore.recordHostLoaded(it, target) }
         if (!ConfigStore.isApplicationEnabledInHookedProcess(target.packageName)) return
 
-        // TODO: 在这里注册各宿主的真实功能 Hook；配置入口与 Hook 分发保持独立。
-        // FeatureRegistry.dispatch(lpparam)
+        FeatureRegistry.dispatch(hostContext, lpparam, target)
     }
     companion object {
         fun log(msg: String, throwable: Throwable? = null) {

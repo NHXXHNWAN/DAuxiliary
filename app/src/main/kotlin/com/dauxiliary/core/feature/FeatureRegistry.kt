@@ -3,6 +3,7 @@ package com.dauxiliary.core.feature
 import android.content.Context
 import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.core.registry.AppTarget
+import com.dauxiliary.core.xposed.HostEntryHook
 
 /** Central feature catalogue shared by all injected hosts. */
 object FeatureRegistry {
@@ -64,12 +65,26 @@ object FeatureRegistry {
 
     fun categoriesFor(host: AppTarget): List<FeatureCategory> =
         featuresFor(host).map { it.category }.distinct()
-
     fun isEnabled(context: Context, host: AppTarget, feature: FeatureDefinition): Boolean =
         ConfigStore.enabledFeatureIds(context, host).contains(feature.id)
 
+    fun isEnabled(context: Context, host: AppTarget, featureId: String): Boolean =
+        ConfigStore.enabledFeatureIds(context, host).contains(featureId)
+
+
     fun enabledCount(context: Context, host: AppTarget): Int =
         featuresFor(host).count { it.implemented && isEnabled(context, host, it) }
+
+    fun dispatch(
+        context: Context?,
+        lpparam: de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam,
+        host: AppTarget,
+    ) {
+        if (ConfigStore.isFeatureEnabledInHookedProcess(host, "home.module_settings")) {
+            HostEntryHook.install(host)
+        }
+        // Other host feature hooks can be registered here without changing EntryHook.
+    }
 
     fun setEnabled(context: Context, host: AppTarget, feature: FeatureDefinition, enabled: Boolean) {
         ConfigStore.setFeatureEnabled(context, host, feature.id, enabled)

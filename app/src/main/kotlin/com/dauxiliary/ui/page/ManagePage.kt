@@ -1,16 +1,10 @@
 package com.dauxiliary.ui.page
 
-import android.content.ActivityNotFoundException
 import android.content.Context
-import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.graphics.drawable.Drawable
-import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-// Layout spacing is expressed through explicit card padding.
-
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -47,14 +41,12 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Sidebar
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-/** Host application selection and quick launcher used by the module. */
+/** Host application switches and installation status. */
 @Composable
 fun ManagePage() {
     val context = LocalContext.current
     GroupedPage(title = "管理") {
-        item(key = "manage_title") {
-            SmallTitle(text = "宿主应用")
-        }
+        item(key = "manage_title") { SmallTitle(text = "宿主应用") }
         AppTarget.entries.forEach { target ->
             item(key = "host_${target.packageName}") {
                 HostApplicationCard(context, target)
@@ -65,27 +57,24 @@ fun ManagePage() {
 
 @Composable
 private fun HostApplicationCard(context: Context, target: AppTarget) {
-    val hostInfo = remember(target.packageName) { context.packageManager.hostApplicationInfo(target.packageName) }
+    val hostInfo = remember(target.packageName) {
+        context.packageManager.hostApplicationInfo(target.packageName)
+    }
     var enabled by rememberSaveable(target.packageName) {
         mutableStateOf(ConfigStore.enabledApplicationPackages(context).contains(target.packageName))
     }
-    val isInstalled = hostInfo != null
-    val summary = if (isInstalled) "点击卡片打开应用" else "未安装，暂不可打开"
+    val installed = hostInfo != null
     val iconPainter = hostInfo?.let { rememberApplicationIcon(it) }
-    val cardColor = if (isInstalled) {
-        MiuixTheme.colorScheme.surfaceContainer
-    } else {
-        MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f)
-    }
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clickable { context.launchHost(target) },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         cornerRadius = 20.dp,
         colors = CardDefaults.defaultColors(
-            color = cardColor,
+            color = if (installed) {
+                MiuixTheme.colorScheme.surfaceContainer
+            } else {
+                MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f)
+            },
             contentColor = MiuixTheme.colorScheme.onSurface,
         ),
     ) {
@@ -95,16 +84,13 @@ private fun HostApplicationCard(context: Context, target: AppTarget) {
                 .padding(start = 16.dp, end = 12.dp, top = 14.dp, bottom = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            HostIcon(target, iconPainter, isInstalled)
+            HostIcon(target, iconPainter, installed)
             Spacer(Modifier.size(14.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = target.displayName,
-                    color = MiuixTheme.colorScheme.onSurface,
-                )
+                Text(text = target.displayName, color = MiuixTheme.colorScheme.onSurface)
                 Spacer(Modifier.size(4.dp))
                 Text(
-                    text = summary,
+                    text = if (installed) "已识别，可在应用内打开模块入口" else "未安装，暂不可使用",
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
@@ -162,21 +148,3 @@ private fun rememberApplicationIcon(info: ApplicationInfo): Painter? {
 
 private fun android.content.pm.PackageManager.hostApplicationInfo(packageName: String): ApplicationInfo? =
     runCatching { getApplicationInfo(packageName, 0) }.getOrNull()
-
-private fun Context.launchHost(target: AppTarget) {
-    val launchIntent = runCatching {
-        packageManager.getLaunchIntentForPackage(target.packageName)
-    }.getOrNull()
-    if (launchIntent == null) {
-        Toast.makeText(this, "${target.displayName}未安装或没有可用入口", Toast.LENGTH_SHORT).show()
-        return
-    }
-    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    try {
-        startActivity(launchIntent)
-    } catch (_: ActivityNotFoundException) {
-        Toast.makeText(this, "无法打开${target.displayName}", Toast.LENGTH_SHORT).show()
-    } catch (_: SecurityException) {
-        Toast.makeText(this, "没有权限打开${target.displayName}", Toast.LENGTH_SHORT).show()
-    }
-}
