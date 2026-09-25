@@ -83,7 +83,20 @@ fun GroupedPage(
             }
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().layerBackdrop(pageBackdrop)) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                // Scaffold's top inset belongs to the whole refresh container, not only to the
+                // LazyColumn. Otherwise PullToRefresh starts at y=0 and is painted under the bar.
+                .padding(
+                    top = if (onRefresh != null && pullToRefreshState != null) {
+                        padding.calculateTopPadding()
+                    } else {
+                        0.dp
+                    },
+                )
+                .layerBackdrop(pageBackdrop),
+        ) {
             val listContent: @Composable () -> Unit = {
                 LazyColumn(
                 state = listState,
@@ -101,13 +114,16 @@ fun GroupedPage(
                 contentPadding = PaddingValues(
                     start = padding.calculateStartPadding(layoutDirection),
                     end = padding.calculateEndPadding(layoutDirection),
-                    top = padding.calculateTopPadding(),
+                    top = if (onRefresh != null && pullToRefreshState != null) 0.dp else padding.calculateTopPadding(),
                     bottom = maxOf(navigationBottom, padding.calculateBottomPadding()) + 24.dp,
                 ),
                 content = content,
                 )
             }
             if (onRefresh != null && pullToRefreshState != null) {
+                // Keep the refresh container below the progressive app bar. Miuix draws the
+                // pull indicator relative to this container; letting it start at y=0 makes the
+                // translucent app bar paint over the indicator.
                 PullToRefresh(
                     modifier = Modifier.fillMaxSize(),
                     isRefreshing = isRefreshing,
