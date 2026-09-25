@@ -16,6 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -58,6 +59,7 @@ fun AboutPage(onBack: () -> Unit) {
             }
         }
     }
+    val topAppBarScrollBehavior = MiuixScrollBehavior()
     val collapsed by remember { derivedStateOf { scrollProgress >= 1f } }
     val surface = MiuixTheme.colorScheme.surface
     val shaderSupported = remember { isRuntimeShaderSupported() }
@@ -82,13 +84,14 @@ fun AboutPage(onBack: () -> Unit) {
     Scaffold(
         containerColor = surface,
         topBar = {
+            // This follows the Miuix About example: the custom hero uses a pinned
+            // SmallTopAppBar, while the same scroll behavior drives its collapsed title.
             Box(
                 Modifier.then(
                     if (shaderSupported) Modifier.drawBackdrop(
                         backdrop = pageBackdrop,
                         shape = { RectangleShape },
                         effects = {
-                            // Miuix official Gaussian blur pipeline.
                             blur(25f)
                             blendColors(topBarBlurColors)
                         },
@@ -97,10 +100,12 @@ fun AboutPage(onBack: () -> Unit) {
             ) {
                 SmallTopAppBar(
                     title = "关于",
+                    scrollBehavior = topAppBarScrollBehavior,
                     titleColor = MiuixTheme.colorScheme.onSurface.copy(
                         alpha = ((scrollProgress - 0.35f) / 0.65f).coerceIn(0f, 1f),
                     ),
-                    color = if (shaderSupported) Color.Transparent else surface,
+                    color = if (shaderSupported || !collapsed) Color.Transparent else surface,
+                    defaultWindowInsetsPadding = false,
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(imageVector = MiuixIcons.Back, contentDescription = "返回")
@@ -123,7 +128,7 @@ fun AboutPage(onBack: () -> Unit) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = padding.calculateTopPadding() + 92.dp, start = 20.dp, end = 20.dp)
+                        .padding(top = padding.calculateTopPadding() + 52.dp, start = 20.dp, end = 20.dp)
                         .onSizeChanged { with(density) { logoHeight = it.height.toDp() } },
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -166,12 +171,15 @@ fun AboutPage(onBack: () -> Unit) {
                 }
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize().overScrollVertical(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .overScrollVertical()
+                        .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
                     overscrollEffect = null,
                     contentPadding = PaddingValues(top = padding.calculateTopPadding()),
                 ) {
                     item(key = "logoSpacer") {
-                        Spacer(Modifier.fillMaxWidth().height(logoHeight + 92.dp + 126.dp))
+                        Spacer(Modifier.fillMaxWidth().height(logoHeight + 52.dp + 126.dp))
                     }
                     item(key = "aboutCards") {
                         Box {

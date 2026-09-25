@@ -13,7 +13,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,15 +28,15 @@ import top.yukonga.miuix.kmp.utils.overScrollVertical
 // The host supplies its bottom-bar inset to list content, not to the viewport.
 internal val LocalNavigationPadding = compositionLocalOf { PaddingValues() }
 
-/** Page insets and navigation insets are merged, never added twice. */
+/** A single Miuix progressive page scaffold shared by the main pages. */
 @Composable
 fun GroupedPage(
     title: String,
     navigationIcon: (@Composable () -> Unit)? = null,
-    containerColor: androidx.compose.ui.graphics.Color = MiuixTheme.colorScheme.surface,
+    containerColor: Color = MiuixTheme.colorScheme.surface,
     isRefreshing: Boolean = false,
     onRefresh: (() -> Unit)? = null,
-    pullToRefreshState: top.yukonga.miuix.kmp.basic.PullToRefreshState? = null,
+    pullToRefreshState: PullToRefreshState? = null,
     content: LazyListScope.() -> Unit,
 ) {
     val scrollBehavior = MiuixScrollBehavior()
@@ -54,81 +53,65 @@ fun GroupedPage(
     Scaffold(
         containerColor = containerColor,
         topBar = {
-            Box(
-                Modifier.then(
-                    if (shaderSupported) Modifier.drawBackdrop(
+            // Do not wrap TopAppBar in another measured app-bar container. TopAppBar itself is
+            // the only top bar, and its MiuixScrollBehavior owns the progressive title layout.
+            TopAppBar(
+                modifier = if (shaderSupported) {
+                    Modifier.drawBackdrop(
                         backdrop = pageBackdrop,
                         shape = { RectangleShape },
                         effects = {
-                            // Keep the progressive app bar translucent while the list moves below it.
                             blur(25f)
                             blendColors(topBarBlurColors)
                         },
-                    ) else Modifier,
-                ),
-            ) {
-                // Miuix's TopAppBar is the official progressive app bar: it expands to a
-                // large title at the top and progressively collapses as the list scrolls.
-                // Unlike the previous pinned SmallTopAppBar, its scroll range also leaves the
-                // pull-to-refresh indicator visible instead of putting it behind the bar.
-                TopAppBar(
-                    title = title,
-                    largeTitle = title,
-                    titleColor = MiuixTheme.colorScheme.onSurface,
-                    largeTitleColor = MiuixTheme.colorScheme.onSurface,
-                    color = if (shaderSupported) Color.Transparent else surface,
-                    navigationIcon = navigationIcon ?: {},
-                    scrollBehavior = scrollBehavior,
-                )
-            }
+                    )
+                } else {
+                    Modifier
+                },
+                title = title,
+                largeTitle = title,
+                titleColor = MiuixTheme.colorScheme.onSurface,
+                largeTitleColor = MiuixTheme.colorScheme.onSurface,
+                color = if (shaderSupported) Color.Transparent else surface,
+                navigationIcon = navigationIcon ?: {},
+                scrollBehavior = scrollBehavior,
+            )
         },
     ) { padding ->
-        Box(
-            Modifier
-                .fillMaxSize()
-                // Scaffold's top inset belongs to the whole refresh container, not only to the
-                // LazyColumn. Otherwise PullToRefresh starts at y=0 and is painted under the bar.
-                .padding(
-                    top = if (onRefresh != null && pullToRefreshState != null) {
-                        padding.calculateTopPadding()
-                    } else {
-                        0.dp
-                    },
-                )
-                .layerBackdrop(pageBackdrop),
-        ) {
+        // Scaffold's padding is passed to the scroll content, exactly as in the Miuix examples.
+        // It must not be applied to the PullToRefresh viewport itself: PullToRefresh uses this
+        // same top padding to place its indicator below the app bar.
+        Box(Modifier.fillMaxSize().layerBackdrop(pageBackdrop)) {
+            val contentPadding = PaddingValues(
+                start = padding.calculateStartPadding(layoutDirection),
+                end = padding.calculateEndPadding(layoutDirection),
+                top = padding.calculateTopPadding(),
+                bottom = maxOf(navigationBottom, padding.calculateBottomPadding()) + 24.dp,
+            )
             val listContent: @Composable () -> Unit = {
                 LazyColumn(
-                state = listState,
-                // Official order: boundary bounce wraps the app-bar scroll connection.
-                // Explicit modifier also supports pages shorter than the viewport.
-                modifier = Modifier
-                    .fillMaxSize()
-                    .overScrollVertical()
-                    .then(
-                        if (navigationIcon == null) Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
-                        else Modifier,
-                    ),
-                overscrollEffect = null, // Never stack the theme factory with the modifier.
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(
-                    start = padding.calculateStartPadding(layoutDirection),
-                    end = padding.calculateEndPadding(layoutDirection),
-                    top = if (onRefresh != null && pullToRefreshState != null) 0.dp else padding.calculateTopPadding(),
-                    bottom = maxOf(navigationBottom, padding.calculateBottomPadding()) + 24.dp,
-                ),
-                content = content,
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .overScrollVertical()
+                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    overscrollEffect = null,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = contentPadding,
+                    content = content,
                 )
             }
             if (onRefresh != null && pullToRefreshState != null) {
-                // Keep the refresh container below the progressive app bar. Miuix draws the
-                // pull indicator relative to this container; letting it start at y=0 makes the
-                // translucent app bar paint over the indicator.
                 PullToRefresh(
                     modifier = Modifier.fillMaxSize(),
                     isRefreshing = isRefreshing,
                     onRefresh = onRefresh,
                     pullToRefreshState = pullToRefreshState,
+                    contentPadding = contentPadding,
+                    // This is the official Miuix coordination point. Without it, the refresh
+                    // connection and the app-bar connection compete, leaving the indicator under
+                    // the progressive bar and making the title appear duplicated.
+                    topAppBarScrollBehavior = scrollBehavior,
                     refreshTexts = listOf("下拉刷新", "松开刷新", "正在刷新", "刷新成功"),
                 ) { listContent() }
             } else {
