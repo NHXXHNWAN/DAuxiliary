@@ -18,13 +18,13 @@ permissions:
 jobs:
   build:
     name: Build release APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
@@ -106,7 +106,7 @@ jobs:
         run: ./gradlew :app:assembleRelease --no-daemon --console=plain -PversionName=${{ steps.release.outputs.version_name }} -PversionCode=${{ steps.release.outputs.version_code }}
 
       - name: Upload release APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: DAuxiliary-release-${{ github.sha }}
           path: app/build/outputs/apk/release/*.apk
