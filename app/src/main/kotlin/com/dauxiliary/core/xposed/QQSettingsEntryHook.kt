@@ -123,7 +123,7 @@ internal object QQSettingsEntryHook {
         }.getOrNull()
         val callback = Proxy.newProxyInstance(callbackType.classLoader ?: classLoader, arrayOf(callbackType)) { proxy, method, args ->
             when (method.name) {
-                "invoke" -> { HostSettingsLauncher.open(context, AppTarget.QQ); unit }
+                "invoke" -> { QQInProcessSettings.open(context, classLoader); unit }
                 "toString" -> "DAuxiliaryCallback"
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === args?.firstOrNull()

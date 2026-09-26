@@ -4,7 +4,6 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
-    <!-- Required to resolve host app icons and launcher activities on Android 11+. -->
     <queries>
         <package android:name="com.ss.android.ugc.aweme" />
         <package android:name="com.tencent.mm" />
@@ -12,7 +11,6 @@
     </queries>
 
     <application
-
         android:allowBackup="true"
         android:icon="@drawable/ic_launcher"
         android:roundIcon="@drawable/ic_launcher"
@@ -22,7 +20,6 @@
         android:theme="@style/Theme.DAuxiliary"
         tools:targetApi="31">
 
-        <!-- Main UI entry (Compose + Miuix) -->
         <activity
             android:name=".ui.MainActivity"
             android:enableOnBackInvokedCallback="true"
@@ -33,14 +30,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <!-- Module settings screen launched from QQ's native settings item. -->
-        <activity
-            android:name=".ui.HostSettingsActivity"
-            android:enableOnBackInvokedCallback="true"
-            android:exported="true"
-            android:label="@string/app_name"
-            android:theme="@style/Theme.DAuxiliary" />
 
         <provider
             android:name=".core.config.ModuleStatusProvider"
@@ -58,11 +47,9 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- LibXposed reads module entry, scope and API level from META-INF/xposed. -->
         <meta-data
             android:name="xposedmodule"
             android:value="true"
             tools:replace="android:value" />
     </application>
-
 </manifest>
