@@ -24,7 +24,7 @@ DAuxiliary 是一个面向 Android 宿主应用的 LSPosed 模块，使用 Kotli
 - **多宿主分发**：统一识别抖音、微信和 QQ，并按宿主隔离配置。
 - **LibXposed API 102**：使用现代模块生命周期和远程配置，不依赖旧式 Xposed API。
 - **Miuix 设置界面**：宿主内设置入口使用轻量 Compose 页面和 Miuix 组件。
-- **动态解析预留**：QQ 相关目标优先通过 DexKit 进行动态分析，避免依赖单一混淆名称。
+- **QQNT 撤回拦截**：独立 Hook QQNT `onMsfPush`，通过 Protobuf 消息类型识别撤回推送；实验性，尚待真机验证。
 - **安全降级**：目标无法可靠定位时记录原因并跳过，不阻塞宿主启动。
 - **配置持久化**：模块进程保存配置，宿主进程通过 LibXposed remote preferences 读取。
 
@@ -33,20 +33,14 @@ DAuxiliary 是一个面向 Android 宿主应用的 LSPosed 模块，使用 Kotli
 | 宿主 | 功能 | 状态 | 说明 |
 | --- | --- | --- | --- |
 | 抖音 / 微信 / QQ | 宿主内模块设置入口 | 已实现，待广泛真机验证 | QQ 使用设置页注入与视图回退；其他宿主使用轻量入口 |
-| QQ | 防撤回开关与初始化骨架 | 实验性，未稳定支持 | 已加入独立开关和安全初始化；QQ 9.3.60 分析材料中尚未确认可安全 Hook 的 Java 撤回目标 |
-| QQ | 防撤回实际拦截 | 未实现 | 未确认目标前不安装任意方法 Hook，也不修改 Native 二进制 |
+| QQ | 防撤回 | 实验性，待真机验证 | 已实现 QQNT `onMsfPush` 系统推送 Hook，并按 Protobuf ContentHead 类型过滤私聊/群聊撤回；未解析到的消息仍走 QQ 原流程 |
 | 抖音 / 微信 | 具体功能 Hook | 开发中 | 当前仓库没有可宣称稳定支持的具体功能 |
 
 ### QQ 防撤回边界
 
-QQ 防撤回功能目前只完成以下部分：
+QQ 防撤回实现采用独立开关与 QQNT 系统推送 Hook：当功能开启时，模块尝试定位 `IQQNTWrapperSession$CppProxy.onMsfPush`，只处理命令字 `trpc.msg.olpush.OlPushService.MsgPush`，并解析 Protobuf `MsgPush → Message → ContentHead`。命中 C2C 撤回（`type=528, subType=138`）或群撤回（`type=732, subType=17`）时阻断该撤回推送，避免 QQ 后续按此推送删除本地消息；其他推送、未知结构及解析失败均放行原始逻辑。
 
-1. 在 QQ 功能页提供默认关闭的实验性开关；
-2. 开关开启后进入独立的 QQ 防撤回初始化流程；
-3. 启动 DexKit 预热并记录初始化状态；
-4. 在没有可靠目标时明确跳过，保持 QQ 原始行为。
-
-当前不会把 `onMsfPush`、Native `libkernel.so` 函数或反编译产物当作已验证目标。原因是现有 QQ 9.3.60 工作区分析材料没有提供足够的 Java 方法或 Native 符号证据，直接按网上其他版本的名称或偏移 Hook 具有崩溃和误拦截风险。后续需要补充目标版本的运行日志、完整类信息或 Native 分析后再实现实际拦截。
+该路径依据 QAuxiliary 开源实现及其 Protobuf 定义设计，仍属实验性实现，尚未在目标 QQ 版本与 LSPosed 真机环境验证。Hook 方法签名、推送行为和返回/拦截语义可能随 QQ 版本变化；请先在测试账号和测试环境验证，不宣称稳定支持。
 
 <p align="center">
   <img src="docs/assets/feature-flow.svg" alt="功能流程" width="100%" />
@@ -75,7 +69,7 @@ QQ 防撤回功能目前只完成以下部分：
 5. 通过宿主内的 DAuxiliary 入口打开设置页。
 6. 只启用已经完成对应版本验证的功能。
 
-QQ 防撤回当前属于实验性功能，开启后若日志显示目标未找到或初始化跳过，不代表 QQ 异常；这是预期的安全回退行为。
+QQ 防撤回当前属于实验性功能。若日志显示回调未找到、签名歧义或 Hook 初始化失败，模块会保留 QQ 原始行为；即使 Hook 注册成功，也需要通过私聊与群聊撤回场景验证实际效果。
 
 ## 配置与架构
 
@@ -89,7 +83,7 @@ EntryHook
         │   ├── QQSettingsEntryHook
         │   └── 通用宿主入口
         └── QQRecallHook（仅开关开启时初始化）
-            └── QQDexKitResolver 预热
+            └── onMsfPush 撤回推送识别与拦截
 ```
 
 每个功能应满足：
@@ -157,7 +151,7 @@ Release 签名通过 CI 环境变量提供，仓库不保存 keystore。当前�
 
 - **宿主内没有入口**：检查 LSPosed 作用域、宿主包名、主进程和模块总开关，然后重启宿主。
 - **QQ 设置入口没有出现**：检查 QQ 版本是否接近 9.3.60，并查看 `DAuxiliary` 日志中的 provider/fallback 状态。
-- **QQ 防撤回没有效果**：当前功能尚未完成实际撤回拦截，这是已知限制，不应通过强行修改未知方法解决。
+- **QQ 防撤回没有效果**：先确认功能开关、QQ 进程重启和 `DAuxiliary` 日志；当前 Hook 属于实验性实现，可能因 QQ 版本、回调签名或推送格式变化而未命中。
 - **宿主启动异常**：立即关闭模块或取消对应作用域，并提供完整日志；所有新增 Hook 都应优先保证安全回退。
 - **构建失败**：先确认 JDK 17、Android SDK 37 和依赖仓库可用，不要根据超时结果判断构建成功。
 

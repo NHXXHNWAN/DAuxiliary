@@ -65,7 +65,7 @@ object FeatureRegistry {
         FeatureDefinition(
             id = QQRecallHook.FEATURE_ID,
             title = "QQ 防撤回（实验性）",
-            summary = "仅对已验证的撤回目标执行保护；当前 QQ 9.3.60 分析材料尚未确认目标，无法定位时保持 QQ 原始行为。",
+            summary = "实验性拦截 QQNT 私聊与群聊撤回推送；仅识别已知 Protobuf 类型，运行效果尚待真机验证。",
             category = FeatureCategory.CHAT,
             hosts = setOf(AppTarget.QQ),
         ),
