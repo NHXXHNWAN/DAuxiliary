@@ -90,10 +90,11 @@ object FeatureRegistry {
         packageParam: XposedModuleInterface.PackageReadyParam,
         host: AppTarget,
     ) {
-        val entryEnabled = ConfigStore.isFeatureEnabledInHookedProcess(host, "home.module_settings")
-        if (entryEnabled) {
-            HostEntryHook.install(xposed, host, packageParam.classLoader)
-        }
+        // The in-host entry is the recovery path for configuring the module. Do not
+        // gate it behind a possibly stale per-feature set; otherwise a missing entry
+        // makes the feature impossible to re-enable from the host.
+        HostEntryHook.install(xposed, host, packageParam.classLoader)
+
         if (host == AppTarget.QQ &&
             ConfigStore.isFeatureEnabledInHookedProcess(host, QQRecallHook.FEATURE_ID)
         ) {

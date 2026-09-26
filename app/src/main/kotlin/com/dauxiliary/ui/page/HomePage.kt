@@ -55,12 +55,13 @@ fun HomePage(
     val updateScope = rememberCoroutineScope()
     var isDownloading by remember { mutableStateOf(false) }
     var showReleaseNotes by remember { mutableStateOf(false) }
-    val updateChannel = UpdateChannel.entries[updateChannelIndex.coerceIn(0, UpdateChannel.entries.lastIndex)]
+    val updateChannel = UpdateChannel.entries.getOrElse(updateChannelIndex) { UpdateChannel.STABLE }
     var refresh by remember { mutableIntStateOf(0) }
     var isRefreshing by remember { mutableStateOf(false) }
     val pullToRefreshState = rememberPullToRefreshState()
 
     fun checkForUpdate() {
+        if (updateChannel == UpdateChannel.DISABLED) return
         if (isRefreshing) return
         isRefreshing = true
         updateScope.launch {

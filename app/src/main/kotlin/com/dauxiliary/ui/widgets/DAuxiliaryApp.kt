@@ -77,6 +77,7 @@ private fun MainNavigation(
             ConfigStore.prefs(context).getInt(ConfigStore.KEY_UPDATE_CHANNEL, 0),
         )
     }
+
     var homeUpdate by remember { mutableStateOf<UpdateInfo?>(null) }
     var homeUpdateChecked by remember { mutableStateOf(false) }
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 3 })

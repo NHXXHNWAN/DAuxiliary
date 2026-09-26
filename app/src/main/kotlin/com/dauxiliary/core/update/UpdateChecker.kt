@@ -1,5 +1,5 @@
 package com.dauxiliary.core.update
-
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -8,7 +8,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 
-data class UpdateInfo(
+ data class UpdateInfo(
+
     val currentVersion: String,
     val latestVersion: String,
     val releaseNotes: String,
@@ -20,6 +21,7 @@ data class UpdateInfo(
 enum class UpdateChannel(val label: String) {
     STABLE("稳定版"),
     TEST("测试版"),
+    DISABLED("不检查更新"),
 }
 
 object UpdateChecker {
@@ -31,10 +33,12 @@ object UpdateChecker {
 
     suspend fun check(currentVersion: String, channel: UpdateChannel): UpdateInfo? =
         withContext(Dispatchers.IO) {
+            if (channel == UpdateChannel.DISABLED) return@withContext null
             runCatching {
                 when (channel) {
                     UpdateChannel.STABLE -> checkStable(currentVersion)
                     UpdateChannel.TEST -> checkTest(currentVersion)
+                    UpdateChannel.DISABLED -> null
                 }
             }.getOrNull()
         }
@@ -99,8 +103,14 @@ object UpdateChecker {
         val tag = release.optString("tag_name")
             .removePrefix("test-")
             .removePrefix("TEST-")
-        // Test tags end with the short commit SHA; it is not part of the APK version.
-        return normalize(tag.substringBeforeLast("-", missingDelimiterValue = tag))
+        // Keep the workflow run suffix because the APK versionName contains it.
+        // Only remove the trailing commit SHA from test tags.
+        val version = if (tag.matches(Regex(".*-[0-9a-fA-F]{7}$"))) {
+            tag.substringBeforeLast("-")
+        } else {
+            tag
+        }
+        return normalize(version)
     }
 
     private fun compactNotes(body: String, fallback: String): String = body
@@ -145,8 +155,10 @@ object UpdateChecker {
     private fun openConnection(url: String): HttpURLConnection =
         (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
+            useCaches = false
             connectTimeout = 10_000
             readTimeout = 10_000
+            setRequestProperty("Cache-Control", "no-cache")
             setRequestProperty("Accept", "application/vnd.github+json")
             setRequestProperty("User-Agent", USER_AGENT)
         }

@@ -1,12 +1,11 @@
 package com.dauxiliary.core.xposed
 
 import android.app.Activity
+import android.app.Application
 import android.app.Dialog
-import android.app.Instrumentation
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
-import android.os.Bundle
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
@@ -19,45 +18,82 @@ import com.dauxiliary.core.registry.AppTarget
 import com.dauxiliary.ui.injected.InjectedModuleSettings
 import io.github.libxposed.api.XposedInterface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import java.util.Collections
 import java.util.Locale
+import java.util.WeakHashMap
 
 /** Stable in-host entry. Uses a native view so it remains visible before Compose is ready. */
 object HostEntryHook {
+    private const val TAG = "DAuxiliary"
     private const val TAG_PREFIX = "dauxiliary_host_entry_"
     private val installedTargets = mutableSetOf<AppTarget>()
+    private val registeredApplications = Collections.newSetFromMap(WeakHashMap<Application, Boolean>())
 
     fun install(xposed: XposedInterface, target: AppTarget, classLoader: ClassLoader) {
         if (target == AppTarget.QQ) {
-            // Keep the native QQ settings-row integration, but also install the
-            // floating entry as a reliable fallback when QQ's provider changes.
             QQSettingsEntryHook.install(xposed, classLoader)
         }
         synchronized(installedTargets) {
             if (!installedTargets.add(target)) return
         }
+
+        var installed = false
+        currentApplication()?.let { application ->
+            synchronized(registeredApplications) {
+                if (registeredApplications.add(application)) {
+                    application.registerActivityLifecycleCallbacks(
+                        object : Application.ActivityLifecycleCallbacks {
+                            override fun onActivityResumed(activity: Activity) {
+                                scheduleOverlay(activity, target)
+                            }
+
+                            override fun onActivityCreated(activity: Activity, state: android.os.Bundle?) = Unit
+                            override fun onActivityStarted(activity: Activity) = Unit
+                            override fun onActivityPaused(activity: Activity) = Unit
+                            override fun onActivityStopped(activity: Activity) = Unit
+                            override fun onActivitySaveInstanceState(activity: Activity, state: android.os.Bundle) = Unit
+                            override fun onActivityDestroyed(activity: Activity) = Unit
+                        },
+                    )
+                    installed = true
+                    Log.i(TAG, "${target.displayName} lifecycle entry registered")
+                }
+            }
+        }
+
+        // Fallback for processes where the Application instance is not available yet.
         runCatching {
-            val method = Instrumentation::class.java.getDeclaredMethod(
-                "callActivityOnResume",
-                Activity::class.java,
-            )
+            val method = Activity::class.java.getDeclaredMethod("onResume")
             xposed.hook(method)
-                .setId("${target.name.lowercase(Locale.ROOT)}.instrumentation.call_activity_on_resume")
+                .setId("${target.name.lowercase(Locale.ROOT)}.activity.on_resume")
                 .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
                 .intercept { chain ->
                     val result = chain.proceed()
-                    val activity = chain.args.firstOrNull() as? Activity
-                    if (activity != null) {
-                        activity.runOnUiThread {
-                            activity.window?.decorView?.postDelayed(
-                                { installOverlay(activity, target) },
-                                120L,
-                            )
-                        }
-                    }
+                    (chain.thisObject as? Activity)?.let { scheduleOverlay(it, target) }
                     result
                 }
+            installed = true
+            Log.i(TAG, "${target.displayName} Activity.onResume entry fallback registered")
         }.onFailure { error ->
-            Log.e("DAuxiliary", "Failed to install ${target.displayName} entry hook", error)
+            Log.e(TAG, "Failed to install ${target.displayName} entry fallback", error)
+        }
+
+        if (!installed) {
+            synchronized(installedTargets) { installedTargets.remove(target) }
+            Log.e(TAG, "No host entry mechanism available for ${target.displayName}")
+        }
+    }
+
+    private fun currentApplication(): Application? = runCatching {
+        Class.forName("android.app.ActivityThread")
+            .getDeclaredMethod("currentApplication")
+            .invoke(null) as? Application
+    }.getOrNull()
+
+    private fun scheduleOverlay(activity: Activity, target: AppTarget) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        activity.runOnUiThread {
+            activity.window?.decorView?.postDelayed({ installOverlay(activity, target) }, 120L)
         }
     }
 
@@ -94,6 +130,7 @@ object HostEntryHook {
             marginEnd = dp(activity, 14)
         }
         root.addView(button, params)
+        Log.i(TAG, "${target.displayName} floating entry shown in ${activity.javaClass.name}")
     }
 
     private fun dp(activity: Activity, value: Int): Int =

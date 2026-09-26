@@ -92,13 +92,9 @@ jobs:
         env:
           TZ: Asia/Shanghai
         run: |
-          # Test builds include the workflow number; manual stable releases keep the timestamp format.
-          version_name="$(date '+%Y%m%d%H%M')"
-          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
-            version_name="${version_name}-${GITHUB_RUN_NUMBER}"
-          fi
-          # Use Unix seconds for versionCode: monotonic, unique, and below Android's 2.1B limit until 2036.
-          version_code="$(date '+%s')"
+          # versionName is the calendar date; versionCode is the date and minute.
+          version_name="$(date '+%y.%-m.%-d')"
+          version_code="$(date '+%Y%m%d%H%M')"
           short_sha="${GITHUB_SHA:0:7}"
           echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
           echo "version_code=$version_code" >> "$GITHUB_OUTPUT"

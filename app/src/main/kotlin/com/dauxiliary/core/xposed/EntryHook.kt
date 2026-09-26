@@ -25,10 +25,15 @@ class EntryHook : XposedModule() {
 
     override fun onPackageReady(param: XposedModuleInterface.PackageReadyParam) {
         val target = AppTarget.fromPackageName(param.packageName) ?: return
-        if (loadedProcess != target.packageName) {
-            log("Skip ${target.displayName}: non-main process ${loadedProcess ?: "unknown"}")
+        val process = loadedProcess
+        if (process != null &&
+            process != target.packageName &&
+            !process.startsWith("${target.packageName}:")
+        ) {
+            log("Skip ${target.displayName}: non-host process $process")
             return
         }
+
         val remotePreferences = getRemotePreferences(ConfigStore.REMOTE_PREFS_GROUP)
         ConfigStore.attachRemotePreferences(remotePreferences)
 

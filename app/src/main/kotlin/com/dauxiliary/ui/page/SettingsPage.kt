@@ -38,8 +38,8 @@ fun SettingsPage(
             GroupCard {
                 OverlayDropdownPreference(
                     title = "更新通道",
-                    items = listOf("稳定版（Release）", "测试版（Test）"),
-                    selectedIndex = updateChannel.coerceIn(0, 1),
+                    items = listOf("稳定版（Release）", "测试版（Test）", "不检查更新"),
+                    selectedIndex = updateChannel.coerceIn(0, 2),
                     onSelectedIndexChange = onUpdateChannelChange,
                 )
             }
