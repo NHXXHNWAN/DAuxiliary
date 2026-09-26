@@ -15,7 +15,7 @@ object FeatureRegistry {
         FeatureDefinition(
             id = "home.module_settings",
             title = "模块设置入口",
-            summary = "在宿主应用内显示轻量模块设置入口。",
+            summary = "通过宿主原生设置项进入模块自有设置页面。",
             category = FeatureCategory.HOME,
             hosts = AppTarget.entries.toSet(),
             implemented = true,
@@ -64,10 +64,11 @@ object FeatureRegistry {
         ),
         FeatureDefinition(
             id = QQRecallHook.FEATURE_ID,
-            title = "QQ 防撤回（实验性）",
-            summary = "实验性拦截 QQNT 私聊与群聊撤回推送；仅识别已知 Protobuf 类型，运行效果尚待真机验证。",
+            title = "QQ 防撤回",
+            summary = "拦截已确认的 QQNT 私聊与群聊撤回推送；未知消息保持 QQ 原始行为。",
             category = FeatureCategory.CHAT,
             hosts = setOf(AppTarget.QQ),
+            implemented = true,
         ),
     )
 
