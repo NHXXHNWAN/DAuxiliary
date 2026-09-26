@@ -17,6 +17,7 @@ internal object HostSettingsLauncher {
     fun open(context: Context, target: AppTarget) {
         runCatching {
             val intent = Intent().apply {
+                setPackage(MODULE_PACKAGE)
                 component = ComponentName(MODULE_PACKAGE, SETTINGS_ACTIVITY)
                 putExtra(EXTRA_HOST, target.name)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
