@@ -4,6 +4,8 @@ import android.content.Context
 import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.core.registry.AppTarget
 import com.dauxiliary.core.xposed.HostEntryHook
+import com.dauxiliary.core.xposed.QQRecallHook
+
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModuleInterface
 
@@ -56,7 +58,14 @@ object FeatureRegistry {
         FeatureDefinition(
             id = "qq.chat_tools",
             title = "QQ 聊天辅助",
-            summary = "QQ 聊天辅助。",
+            summary = "QQ 聊天辅助功能集合。",
+            category = FeatureCategory.CHAT,
+            hosts = setOf(AppTarget.QQ),
+        ),
+        FeatureDefinition(
+            id = QQRecallHook.FEATURE_ID,
+            title = "QQ 防撤回（实验性）",
+            summary = "仅对已验证的撤回目标执行保护；当前 QQ 9.3.60 分析材料尚未确认目标，无法定位时保持 QQ 原始行为。",
             category = FeatureCategory.CHAT,
             hosts = setOf(AppTarget.QQ),
         ),
@@ -84,6 +93,11 @@ object FeatureRegistry {
         val entryEnabled = ConfigStore.isFeatureEnabledInHookedProcess(host, "home.module_settings")
         if (entryEnabled) {
             HostEntryHook.install(xposed, host, packageParam.classLoader)
+        }
+        if (host == AppTarget.QQ &&
+            ConfigStore.isFeatureEnabledInHookedProcess(host, QQRecallHook.FEATURE_ID)
+        ) {
+            QQRecallHook.install(xposed, packageParam.classLoader)
         }
     }
 

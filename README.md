@@ -1,87 +1,136 @@
+<p align="center">
+  <img src="docs/assets/hero.svg" alt="DAuxiliary" width="100%" />
+</p>
+
+<p align="center">
+  <a href="https://developer.android.com/"><img src="https://img.shields.io/badge/Android-API%2033%2B-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android" /></a>
+  <a href="https://kotlinlang.org/"><img src="https://img.shields.io/badge/Kotlin-2.4.10-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin" /></a>
+  <a href="https://github.com/LSPosed/LSPosed"><img src="https://img.shields.io/badge/LSPosed-LibXposed%20API%20102-5B5FEF?style=flat-square" alt="LSPosed" /></a>
+  <a href="https://github.com/NHXXHNWAN/DAuxiliary/tree/Test"><img src="https://img.shields.io/badge/branch-Test-202A44?style=flat-square" alt="Test branch" /></a>
+</p>
+
 # DAuxiliary
 
-DAuxiliary 是一个面向抖音 Android 客户端的 LSPosed 模块。项目的长期目标是在抖音进程内提供可扩展的功能 Hook，并通过模块自身的配置页管理开关。
+DAuxiliary 是一个面向 Android 宿主应用的 LSPosed 模块，使用 Kotlin、Jetpack Compose、Miuix 和现代 LibXposed API 构建。模块负责在宿主进程中按需加载独立功能，并提供宿主内设置入口。
 
-> 当前阶段是基础骨架：已接入 Xposed/LSPosed 入口、抖音内测试入口、配置读写和 Miuix 配置界面；具体抖音功能尚未实现。
+> 当前开发目标是多宿主架构。抖音、微信和 QQ 已纳入宿主分发；具体功能仍以代码状态和真机验证结果为准。未经 QQ/LSPosed 真机验证的功能不会标记为稳定支持。
 
-## 项目定位
+<p align="center">
+  <img src="docs/assets/section-features.svg" alt="核心特性" width="100%" />
+</p>
 
-DAuxiliary 不是一个独立的抖音客户端，也不修改或重新分发抖音本体。APK 主要承担两部分职责：
+## 核心特性
 
-1. 作为 LSPosed 模块安装，并将 `EntryHook` 注册到抖音进程。
-2. 提供模块配置页；实际功能代码在抖音进程中按开关加载。
+- **多宿主分发**：统一识别抖音、微信和 QQ，并按宿主隔离配置。
+- **LibXposed API 102**：使用现代模块生命周期和远程配置，不依赖旧式 Xposed API。
+- **Miuix 设置界面**：宿主内设置入口使用轻量 Compose 页面和 Miuix 组件。
+- **动态解析预留**：QQ 相关目标优先通过 DexKit 进行动态分析，避免依赖单一混淆名称。
+- **安全降级**：目标无法可靠定位时记录原因并跳过，不阻塞宿主启动。
+- **配置持久化**：模块进程保存配置，宿主进程通过 LibXposed remote preferences 读取。
 
-目标包名：`com.ss.android.ugc.aweme`
+## 功能状态
 
-模块包名：`com.dauxiliary`
+| 宿主 | 功能 | 状态 | 说明 |
+| --- | --- | --- | --- |
+| 抖音 / 微信 / QQ | 宿主内模块设置入口 | 已实现，待广泛真机验证 | QQ 使用设置页注入与视图回退；其他宿主使用轻量入口 |
+| QQ | 防撤回开关与初始化骨架 | 实验性，未稳定支持 | 已加入独立开关和安全初始化；QQ 9.3.60 分析材料中尚未确认可安全 Hook 的 Java 撤回目标 |
+| QQ | 防撤回实际拦截 | 未实现 | 未确认目标前不安装任意方法 Hook，也不修改 Native 二进制 |
+| 抖音 / 微信 | 具体功能 Hook | 开发中 | 当前仓库没有可宣称稳定支持的具体功能 |
 
-## 当前状态
+### QQ 防撤回边界
 
-- [x] Gradle Android 项目骨架
-- [x] LSPosed/Xposed 元数据与 `assets/xposed_init`
-- [x] 仅匹配抖音包名的 Xposed 入口
-- [x] 抖音进程内测试入口与配置面板骨架
-- [x] 模块进程与抖音进程之间的配置读写骨架
-- [x] Miuix Compose 主题和配置页面
-- [x] Miuix `FloatingNavigationBar` / `FloatingNavigationBarItem` 配置页导航
-- [ ] 实际抖音功能 Hook
-- [ ] 功能注册表和按功能隔离的 Hook 生命周期
-- [ ] 真机验证不同抖音版本、进程和 ROM 行为
-- [x] GitHub Actions Debug/Release 构建与 Tag 发布流程
-- [ ] Release 签名配置（需要通过 GitHub Secrets 提供 keystore）
+QQ 防撤回功能目前只完成以下部分：
 
-## 技术栈
+1. 在 QQ 功能页提供默认关闭的实验性开关；
+2. 开关开启后进入独立的 QQ 防撤回初始化流程；
+3. 启动 DexKit 预热并记录初始化状态；
+4. 在没有可靠目标时明确跳过，保持 QQ 原始行为。
 
-- Kotlin
-- Android Gradle Plugin + Gradle Wrapper
-- Jetpack Compose
-- Miuix Compose UI
-- LSPosed/Xposed API（`compileOnly`，运行时由 LSPosed 提供）
-- Android SDK 37（当前 Compose/Miuix 依赖的 AAR 元数据要求）
+当前不会把 `onMsfPush`、Native `libkernel.so` 函数或反编译产物当作已验证目标。原因是现有 QQ 9.3.60 工作区分析材料没有提供足够的 Java 方法或 Native 符号证据，直接按网上其他版本的名称或偏移 Hook 具有崩溃和误拦截风险。后续需要补充目标版本的运行日志、完整类信息或 Native 分析后再实现实际拦截。
 
-版本以 `gradle/libs.versions.toml` 为准。Miuix API 仍可能更新，升级版本时必须先核对官方 API 和 Android 编译要求，再修改依赖。
+<p align="center">
+  <img src="docs/assets/feature-flow.svg" alt="功能流程" width="100%" />
+</p>
 
-## 目录结构
+## 支持宿主与兼容性
+
+| 宿主 | 包名 | 当前定位 |
+| --- | --- | --- |
+| 抖音 | `com.ss.android.ugc.aweme` | 已接入宿主入口框架 |
+| 微信 | `com.tencent.mm` | 已接入宿主入口框架 |
+| QQ | `com.tencent.mobileqq` | 以 QQ 9.3.60 为分析基线，设置入口已提供安全回退 |
+
+兼容性不只取决于版本号，还取决于宿主进程、混淆结果、ROM 和 LSPosed 版本。无法定位目标时模块应自动跳过；“开关开启”不等于“Hook 成功”。
+
+<p align="center">
+  <img src="docs/assets/section-installation.svg" alt="安装与启用" width="100%" />
+</p>
+
+## 安装与启用
+
+1. 使用 JDK 17 环境构建或从 GitHub Actions 获取测试 APK。
+2. 在已安装 LSPosed 的测试设备上安装 DAuxiliary。
+3. 在 LSPosed 中启用模块，并将作用域限定到需要测试的宿主。
+4. 强制停止并重新启动宿主应用。
+5. 通过宿主内的 DAuxiliary 入口打开设置页。
+6. 只启用已经完成对应版本验证的功能。
+
+QQ 防撤回当前属于实验性功能，开启后若日志显示目标未找到或初始化跳过，不代表 QQ 异常；这是预期的安全回退行为。
+
+## 配置与架构
+
+配置文件由模块应用持有，宿主进程只通过 LibXposed remote preferences 读取。功能配置按 `AppTarget` 隔离，避免 QQ、微信和抖音互相污染。
 
 ```text
-app/src/main/
-├── AndroidManifest.xml
-├── assets/xposed_init
-├── kotlin/com/dauxiliary/
-│   ├── core/config/ConfigStore.kt
-│   ├── core/xposed/EntryHook.kt
-│   ├── core/xposed/DouyinEntryHook.kt
-│   └── ui/
-│       ├── MainActivity.kt
-│       ├── page/
-│       ├── theme/
-│       └── widgets/DAuxiliaryApp.kt
-└── res/
-
-.github/workflows/build.yml       # GitHub Actions Debug 构建
-AI_DEVELOPMENT_NOTES.md            # 长期开发约束
-CONTRIBUTING.md                     # 开发和提交规范
-gradle/libs.versions.toml          # 依赖版本目录
+EntryHook
+└── AppTarget.fromPackageName()
+    └── FeatureRegistry.dispatch()
+        ├── HostEntryHook
+        │   ├── QQSettingsEntryHook
+        │   └── 通用宿主入口
+        └── QQRecallHook（仅开关开启时初始化）
+            └── QQDexKitResolver 预热
 ```
 
-## 构建与发布
+每个功能应满足：
 
-推送到 `Test` 分支会自动构建 Debug 和 Release APK，并将 APK 保存为 GitHub Actions artifact。
+- 有独立功能 ID 和开关；
+- 关闭时不初始化相关 Hook；
+- 安装过程可重复调用且不会重复注册；
+- 反射、解析和回调都有异常边界；
+- 目标不明确时保留宿主原始行为；
+- 日志不输出聊天正文、账号或群组隐私信息。
 
-要发布 GitHub Release，创建并推送一个版本标签：
+<p align="center">
+  <img src="docs/assets/section-development.svg" alt="开发说明" width="100%" />
+</p>
 
-```bash
-git tag v0.1.0
-git push origin v0.1.0
+## 开发说明
+
+主要目录：
+
+```text
+app/src/main/kotlin/com/dauxiliary/
+├── core/config/       # 配置与宿主状态
+├── core/feature/      # 功能定义与分发
+├── core/registry/     # 宿主枚举
+├── core/xposed/       # LibXposed 入口、设置入口和 QQ 解析器
+└── ui/                # 模块进程与宿主内 Compose/Miuix 页面
+
+docs/assets/           # README 纯 SVG 视觉资源
 ```
 
-标签发布会自动创建同名 GitHub Release，并上传 Debug/Release APK。当前 Release APK 尚未配置签名，只适合测试；正式分发前应通过 GitHub Secrets 配置 keystore，避免将签名私钥提交到仓库。
+依赖版本集中在 `gradle/libs.versions.toml`。当前 Android `compileSdk` 为 37，最低 Android API 为 33，Java/Kotlin 编译目标为 JDK 17。
 
-环境要求：
+本项目开发约束：
 
-- JDK 17 或更高版本
-- Android SDK，至少安装当前 `compileSdk` 对应的平台
-- 可访问 Google Maven、Maven Central 或项目配置的镜像仓库
+- 只在当前工作区修改代码和文档，不直接操作用户设备；
+- 不提交 APK、反编译临时文件、设备日志、`local.properties` 或签名材料；
+- 不把未经验证的版本写成稳定兼容；
+- 不提交 GitHub Token 或其他敏感凭据；
+- 目标分支为 `Test`。
+
+## 构建
 
 Linux/macOS：
 
@@ -102,26 +151,18 @@ Debug APK 输出位置：
 app/build/outputs/apk/debug/app-debug.apk
 ```
 
-如果在 ARM64 Linux/proot 环境构建，可按需执行 `setup_android_env.sh`。该脚本用于准备 Android SDK、Gradle 和 ARM64 AAPT2；它会修改本机环境，不建议在 GitHub Actions 中执行。
+Release 签名通过 CI 环境变量提供，仓库不保存 keystore。当前分支的构建和运行效果仍需结合实际环境确认。
 
-## 安装和使用边界
+## 故障排查
 
-1. 在已安装 LSPosed 的测试设备上安装 Debug APK。
-2. 在 LSPosed 管理器中启用 DAuxiliary，并将作用域限定为抖音。
-3. 强制停止并重新打开抖音，观察模块入口是否出现。
-4. 具体功能开关只在后续功能实现并完成真机验证后启用。
+- **宿主内没有入口**：检查 LSPosed 作用域、宿主包名、主进程和模块总开关，然后重启宿主。
+- **QQ 设置入口没有出现**：检查 QQ 版本是否接近 9.3.60，并查看 `DAuxiliary` 日志中的 provider/fallback 状态。
+- **QQ 防撤回没有效果**：当前功能尚未完成实际撤回拦截，这是已知限制，不应通过强行修改未知方法解决。
+- **宿主启动异常**：立即关闭模块或取消对应作用域，并提供完整日志；所有新增 Hook 都应优先保证安全回退。
+- **构建失败**：先确认 JDK 17、Android SDK 37 和依赖仓库可用，不要根据超时结果判断构建成功。
 
-当前代码不会保证兼容所有抖音版本。抖音的类名、Activity 层级、混淆结果和进程结构可能变化；任何新 Hook 都必须提供版本判断、重复安装保护、异常隔离和关闭开关后的安全行为。
+## 贡献与许可证
 
-## 安全与开发原则
+欢迎提交与宿主版本、解析证据和运行日志相关的改进建议。提交日志时请脱敏账号、聊天正文、群名称和设备标识。
 
-- 只在目标包 `com.ss.android.ugc.aweme` 中安装模块 Hook。
-- Xposed 入口保持轻量；具体功能放入独立 Hook/feature，并避免互相耦合。
-- Hook 代码必须使用 `runCatching` 或等效异常边界，不能因模块异常导致抖音启动崩溃。
-- 不在仓库提交 `local.properties`、签名密钥、设备信息、构建缓存或本地日志。
-- 不提交抖音 APK、反编译产物、用户数据或任何受版权保护的应用资源。
-- 每个功能都应有明确的开关、禁用路径和最小化的 Hook 范围。
-
-## License
-
-当前尚未确定开源许可证。许可证确定前，不要在仓库页面声明项目已按某个许可证发布。
+当前尚未确定 DAuxiliary 的开源许可证。许可证确定前，不在仓库页面声明项目已按某个许可证发布。第三方参考项目的版权和许可证仍需按其原始要求处理。
