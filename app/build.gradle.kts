@@ -59,14 +59,14 @@ android {
             )
         }
     }
-    // Keep the project compatible with the documented JDK 17 build environment.
+    // Match the JDK 21 toolchain and Miuix dependencies compiled for JVM 21.
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
     kotlin {
         compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_17)
+            jvmTarget.set(JvmTarget.JVM_21)
         }
     }
     buildFeatures {
