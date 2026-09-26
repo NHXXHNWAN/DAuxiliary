@@ -87,7 +87,10 @@ internal object QQSettingsEntryHook {
     }
 
     private fun injectProviderGroups(result: Any?, context: Context, classLoader: ClassLoader) {
-        val groups = result as? MutableList<Any?>
+        val groups = (result as? MutableList<*>)?.let { list ->
+            @Suppress("UNCHECKED_CAST")
+            list as MutableList<Any?>
+        }
         if (groups == null) {
             android.util.Log.w(TAG, "QQ provider returned non-mutable list: ${result?.javaClass?.name}")
             return
