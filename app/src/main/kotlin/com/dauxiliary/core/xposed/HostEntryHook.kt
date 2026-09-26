@@ -28,8 +28,9 @@ object HostEntryHook {
 
     fun install(xposed: XposedInterface, target: AppTarget, classLoader: ClassLoader) {
         if (target == AppTarget.QQ) {
+            // Keep the native QQ settings-row integration, but also install the
+            // floating entry as a reliable fallback when QQ's provider changes.
             QQSettingsEntryHook.install(xposed, classLoader)
-            return
         }
         synchronized(installedTargets) {
             if (!installedTargets.add(target)) return
