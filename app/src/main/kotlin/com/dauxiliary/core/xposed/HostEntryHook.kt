@@ -26,7 +26,11 @@ object HostEntryHook {
     private const val TAG_PREFIX = "dauxiliary_host_entry_"
     private val installedTargets = mutableSetOf<AppTarget>()
 
-    fun install(xposed: XposedInterface, target: AppTarget) {
+    fun install(xposed: XposedInterface, target: AppTarget, classLoader: ClassLoader) {
+        if (target == AppTarget.QQ) {
+            QQSettingsEntryHook.install(xposed, classLoader)
+            return
+        }
         synchronized(installedTargets) {
             if (!installedTargets.add(target)) return
         }
@@ -99,7 +103,7 @@ object HostEntryHook {
         ).toInt()
 }
 
-private object HostSettingsDialog {
+internal object HostSettingsDialog {
     fun show(activity: Activity, target: AppTarget) {
         if (activity.isFinishing || activity.isDestroyed) return
         val dialog = Dialog(activity)

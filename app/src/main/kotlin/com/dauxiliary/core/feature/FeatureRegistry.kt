@@ -83,7 +83,7 @@ object FeatureRegistry {
     ) {
         val entryEnabled = ConfigStore.isFeatureEnabledInHookedProcess(host, "home.module_settings")
         if (entryEnabled) {
-            HostEntryHook.install(xposed, host)
+            HostEntryHook.install(xposed, host, packageParam.classLoader)
         }
     }
 

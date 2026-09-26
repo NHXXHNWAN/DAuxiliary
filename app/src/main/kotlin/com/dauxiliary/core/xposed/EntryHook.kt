@@ -15,12 +15,20 @@ import io.github.libxposed.api.XposedModuleInterface
  * XposedHelpers, or XC_* callback is used by the module.
  */
 class EntryHook : XposedModule() {
+    @Volatile
+    private var loadedProcess: String? = null
+
     override fun onModuleLoaded(param: XposedModuleInterface.ModuleLoadedParam) {
+        loadedProcess = param.processName
         log("Module loaded in ${param.processName}")
     }
 
     override fun onPackageReady(param: XposedModuleInterface.PackageReadyParam) {
         val target = AppTarget.fromPackageName(param.packageName) ?: return
+        if (loadedProcess != target.packageName) {
+            log("Skip ${target.displayName}: non-main process ${loadedProcess ?: "unknown"}")
+            return
+        }
         val remotePreferences = getRemotePreferences(ConfigStore.REMOTE_PREFS_GROUP)
         ConfigStore.attachRemotePreferences(remotePreferences)
 
