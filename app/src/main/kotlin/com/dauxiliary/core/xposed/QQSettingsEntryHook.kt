@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -17,217 +18,248 @@ import java.lang.reflect.Proxy
 import java.util.Collections
 import java.util.WeakHashMap
 
-/** QQ entry implemented at QQ's settings provider layer, with a view fallback. */
+/** QQ 9.3.x settings entry. The 9.3.60 provider is main.b -> SettingConfigProvider. */
 internal object QQSettingsEntryHook {
     private const val TAG = "DAuxiliary"
+    private const val MAIN_PROVIDER = "com.tencent.mobileqq.setting.main.b"
     private const val MAIN_SETTING_FRAGMENT = "com.tencent.mobileqq.setting.main.MainSettingFragment"
+    private const val GROUP_PROCESSOR = "com.tencent.mobileqq.setting.processor.b"
+    private const val SIMPLE_PROCESSOR = "com.tencent.mobileqq.setting.processor.i"
+    private const val SIMPLE_BASE = "com.tencent.mobileqq.setting.processor.c"
     private const val FUNCTION0 = "kotlin.jvm.functions.Function0"
+    private const val TITLE = "DAuxiliary 模块设置"
+
     private val installedLoaders = Collections.newSetFromMap(WeakHashMap<ClassLoader, Boolean>())
     private val installedMethods = Collections.newSetFromMap(WeakHashMap<Method, Boolean>())
     private val injectedLists = Collections.newSetFromMap(WeakHashMap<Any, Boolean>())
-    private val injectedParents = Collections.newSetFromMap(WeakHashMap<ViewGroup, Boolean>())
 
     fun install(xposed: XposedInterface, classLoader: ClassLoader) {
         synchronized(installedLoaders) {
-            if (installedLoaders.contains(classLoader)) return
+            if (!installedLoaders.add(classLoader)) return
         }
+        var providerHooks = 0
+        var fallbackHooks = 0
         runCatching {
-            var providerCount = 0
-            listOf(
-                "com.tencent.mobileqq.setting.main.MainSettingConfigProvider",
-                "com.tencent.mobileqq.setting.main.NewSettingConfigProvider",
-                "com.tencent.mobileqq.setting.main.b",
-            ).forEach { providerCount += hookProvider(xposed, classLoader, it) }
-            hookFragmentFallback(xposed, classLoader)
-            synchronized(installedLoaders) { installedLoaders.add(classLoader) }
-            android.util.Log.i(TAG, "QQ entry hooks registered, providers=$providerCount")
+            QQDexKitResolver.warmUp(classLoader)
+            providerHooks = hookProvider(xposed, classLoader)
+            fallbackHooks = hookFragmentFallback(xposed, classLoader)
+            android.util.Log.i(
+                TAG,
+                "QQ 9.3 settings hooks registered: provider=$providerHooks fallback=$fallbackHooks",
+            )
         }.onFailure { error ->
-            android.util.Log.w(TAG, "QQ entry hook registration failed", error)
+            synchronized(installedLoaders) { installedLoaders.remove(classLoader) }
+            android.util.Log.e(TAG, "QQ settings hook registration failed", error)
         }
     }
 
-    private fun hookProvider(xposed: XposedInterface, classLoader: ClassLoader, name: String): Int {
-        val provider = runCatching { classLoader.loadClass(name) }.getOrNull() ?: return 0
-        val methods = provider.declaredMethods.filter { method ->
-            List::class.java.isAssignableFrom(method.returnType) &&
-                method.parameterTypes.size == 1 &&
-                Context::class.java.isAssignableFrom(method.parameterTypes[0])
+    private fun hookProvider(xposed: XposedInterface, classLoader: ClassLoader): Int {
+        val provider = runCatching { classLoader.loadClass(MAIN_PROVIDER) }.getOrNull()
+        if (provider == null) {
+            android.util.Log.w(TAG, "QQ provider class not found: $MAIN_PROVIDER")
+            return 0
         }
-        methods.forEach { method ->
-            method.isAccessible = true
-            synchronized(installedMethods) {
-                if (!installedMethods.add(method)) return@forEach
+        val method = provider.declaredMethods.firstOrNull { candidate ->
+            candidate.name == "f" &&
+                candidate.parameterTypes.contentEquals(arrayOf(Context::class.java)) &&
+                List::class.java.isAssignableFrom(candidate.returnType)
+        }
+        if (method == null) {
+            android.util.Log.w(
+                TAG,
+                "QQ provider method f(Context):List not found; methods=${provider.declaredMethods.joinToString { it.name }}",
+            )
+            return 0
+        }
+        if (!markMethod(method)) return 0
+        method.isAccessible = true
+        xposed.hook(method)
+            .setId("qq.settings.main.b.f")
+            .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+            .intercept { chain ->
+                val result = chain.proceed()
+                val context = chain.args.firstOrNull() as? Context
+                if (context != null) injectProviderGroups(result, context, classLoader)
+                result
             }
-            xposed.hook(method)
-                .setId("qq.settings.provider.${provider.simpleName}.${method.name}")
-                .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
-                .intercept { chain ->
-                    val result = chain.proceed()
-                    val context = chain.args.firstOrNull() as? Context
-                    if (context != null) injectProviderList(result, context, classLoader)
-                    result
-                }
-        }
-        return methods.size
+        android.util.Log.i(TAG, "QQ provider hooked: ${provider.name}.${method.name}${method.parameterTypes.contentToString()}")
+        return 1
     }
 
-    private fun injectProviderList(result: Any?, context: Context, classLoader: ClassLoader) {
-        val groups = result as? MutableList<Any?> ?: return
+    private fun injectProviderGroups(result: Any?, context: Context, classLoader: ClassLoader) {
+        val groups = result as? MutableList<Any?>
+        if (groups == null) {
+            android.util.Log.w(TAG, "QQ provider returned non-mutable list: ${result?.javaClass?.name}")
+            return
+        }
         synchronized(injectedLists) {
             if (!injectedLists.add(groups)) return
         }
-        val group = groups.firstOrNull() ?: return
-        val processors = findNestedList(group) ?: run {
-            synchronized(injectedLists) { injectedLists.remove(groups) }
-            return
-        }
-        val processorClass = findSimpleProcessorClass(classLoader) ?: run {
-            synchronized(injectedLists) { injectedLists.remove(groups) }
-            android.util.Log.w(TAG, "QQ SimpleItemProcessor class not identified for this version")
-            return
-        }
-        val processor = createProcessor(processorClass, context, classLoader) ?: run {
-            synchronized(injectedLists) { injectedLists.remove(groups) }
-            return
-        }
-        val newGroup = createGroup(group.javaClass, processor) ?: run {
-            synchronized(injectedLists) { injectedLists.remove(groups) }
-            return
-        }
-        runCatching { groups.add(minOf(1, groups.size), newGroup) }
-            .onFailure {
-                synchronized(injectedLists) { injectedLists.remove(groups) }
-                android.util.Log.w(TAG, "QQ settings provider list is not mutable", it)
-            }
-    }
 
-    private fun findSimpleProcessorClass(classLoader: ClassLoader): Class<*>? {
-        val candidateNames = listOf(
-            "com.tencent.mobileqq.setting.processor.g",
-            "com.tencent.mobileqq.setting.processor.h",
-            "com.tencent.mobileqq.setting.processor.i",
-            "com.tencent.mobileqq.setting.processor.j",
-            "as3.i",
-            "c25.i",
-            "a35.i",
-        )
-        val baseClass = listOf(
-            "com.tencent.mobileqq.setting.main.processor.AccountSecurityItemProcessor",
-            "com.tencent.mobileqq.setting.main.processor.AboutItemProcessor",
-        ).firstNotNullOfOrNull { name ->
-            runCatching { classLoader.loadClass(name).superclass }.getOrNull()
-        } ?: return null
-        val candidates = candidateNames.mapNotNull { name ->
-            runCatching { classLoader.loadClass(name) }.getOrNull()
-                ?.takeIf { it.superclass == baseClass && it.declaredConstructors.any(::isProcessorConstructor) }
-        }.distinct()
-        return candidates.singleOrNull()
+        val candidates = groups.mapNotNull { group ->
+            group ?: return@mapNotNull null
+            findNestedMutableList(group)?.let { group to it }
+        }
+        if (candidates.isEmpty()) {
+            removeInjectedMarker(groups)
+            android.util.Log.w(TAG, "QQ provider list has no SettingGroupProcessor child list")
+            return
+        }
+
+        val processorClass = QQDexKitResolver.resolveOrNull(classLoader)
+            ?: sequenceOf(
+                SIMPLE_PROCESSOR,
+                "com.tencent.mobileqq.setting.processor.h",
+                "com.tencent.mobileqq.setting.processor.g",
+            ).mapNotNull { name -> runCatching { classLoader.loadClass(name) }.getOrNull() }
+                .firstOrNull(QQDexKitResolver::isSimpleProcessor)
+        if (processorClass == null) {
+            removeInjectedMarker(groups)
+            android.util.Log.w(TAG, "QQ simple processor not resolved by DexKit or fallback candidates")
+            return
+        }
+
+        val target = candidates.firstOrNull { (group, _) ->
+            readCharSequenceFields(group).any { it == "功能" }
+        } ?: candidates.firstOrNull { (_, items) ->
+            items.any { it?.javaClass == processorClass }
+        } ?: candidates.getOrNull(2)
+            ?: candidates.first()
+
+        val processor = createProcessor(processorClass, context, classLoader)
+        if (processor == null) {
+            removeInjectedMarker(groups)
+            android.util.Log.w(TAG, "QQ simple processor construction failed")
+            return
+        }
+        val itemList = target.second
+        runCatching {
+            itemList.add(processor)
+            android.util.Log.i(
+                TAG,
+                "QQ entry injected into group=${target.first.javaClass.name}, items=${itemList.size}",
+            )
+        }.onFailure { error ->
+            removeInjectedMarker(groups)
+            android.util.Log.e(TAG, "QQ group processor list is not mutable", error)
+        }
     }
 
     private fun createProcessor(type: Class<*>, context: Context, classLoader: ClassLoader): Any? {
-        val constructor = type.declaredConstructors.firstOrNull(::isProcessorConstructor) ?: return null
+        val constructor = type.declaredConstructors.firstOrNull(QQDexKitResolver::isSimpleProcessorConstructor) ?: return null
         constructor.isAccessible = true
-        val args = if (constructor.parameterTypes.size == 5) {
-            arrayOf(context, 0, "DAuxiliary", 0, null)
-        } else {
-            arrayOf(context, 0, "DAuxiliary", 0)
-        }
-        val processor = runCatching { constructor.newInstance(*args) }.getOrNull() ?: return null
-        val setter = type.declaredMethods.firstOrNull { method ->
-            method.returnType == Void.TYPE && method.parameterTypes.size == 1 &&
-                method.parameterTypes[0].name == FUNCTION0
-        } ?: return processor
+        val processor = runCatching {
+            constructor.newInstance(context, 0, TITLE, 0, null)
+        }.getOrNull() ?: return null
+
+        val setter = type.declaredMethods.firstOrNull(QQDexKitResolver::isFunction0Setter)
+            ?: return null
         setter.isAccessible = true
         val callbackType = setter.parameterTypes[0]
         val unit = runCatching {
-            callbackType.classLoader?.loadClass("kotlin.Unit")?.getField("INSTANCE")?.get(null)
+            (callbackType.classLoader ?: classLoader).loadClass("kotlin.Unit")
+                .getField("INSTANCE")
+                .get(null)
         }.getOrNull()
         val callback = Proxy.newProxyInstance(
             callbackType.classLoader ?: classLoader,
             arrayOf(callbackType),
-        ) { _, method, _ ->
-            if (method.name == "invoke") {
-                findActivity(context)?.let { HostSettingsDialog.show(it, AppTarget.QQ) }
+        ) { proxy, method, args ->
+            when (method.name) {
+                "invoke" -> {
+                    findActivity(context)?.let { HostSettingsDialog.show(it, AppTarget.QQ) }
+                    unit
+                }
+                "toString" -> "DAuxiliaryCallback"
+                "hashCode" -> System.identityHashCode(proxy)
+                "equals" -> proxy === args?.firstOrNull()
+                else -> unit
             }
-            unit
         }
-        runCatching { setter.invoke(processor, callback) }
-        return processor
+        return runCatching {
+            setter.invoke(processor, callback)
+            processor
+        }.getOrNull()
     }
 
-    private fun isProcessorConstructor(constructor: Constructor<*>): Boolean {
+    private fun isSimpleProcessorConstructor(constructor: Constructor<*>): Boolean {
         val p = constructor.parameterTypes
-        return p.size in 4..5 &&
+        return p.size == 5 &&
             Context::class.java.isAssignableFrom(p[0]) &&
             p[1] == Int::class.javaPrimitiveType &&
             CharSequence::class.java.isAssignableFrom(p[2]) &&
             p[3] == Int::class.javaPrimitiveType &&
-            (p.size == 4 || p[4] == String::class.java)
+            p[4] == String::class.java
     }
 
-    private fun createGroup(type: Class<*>, processor: Any): Any? {
-        val constructor = type.declaredConstructors.firstOrNull { constructor ->
-            val p = constructor.parameterTypes
-            p.size == 3 && List::class.java.isAssignableFrom(p[0]) &&
-                CharSequence::class.java.isAssignableFrom(p[1]) &&
-                CharSequence::class.java.isAssignableFrom(p[2])
-        } ?: type.declaredConstructors.firstOrNull { constructor ->
-            val p = constructor.parameterTypes
-            p.size == 5 && List::class.java.isAssignableFrom(p[0]) &&
-                CharSequence::class.java.isAssignableFrom(p[1]) &&
-                CharSequence::class.java.isAssignableFrom(p[2])
-        } ?: return null
-        constructor.isAccessible = true
-        val values = arrayListOf(processor)
-        return runCatching {
-            if (constructor.parameterTypes.size == 5) {
-                constructor.newInstance(values, "", "", 6, null)
-            } else {
-                constructor.newInstance(values, "", "")
+    private fun findNestedMutableList(value: Any): MutableList<Any?>? {
+        var type: Class<*>? = value.javaClass
+        while (type != null && type != Any::class.java) {
+            type.declaredFields.forEach { field ->
+                runCatching {
+                    field.isAccessible = true
+                    val nested = field.get(value)
+                    if (nested is MutableList<*>) {
+                        @Suppress("UNCHECKED_CAST")
+                        return nested as MutableList<Any?>
+                    }
+                }
             }
-        }.getOrNull()
-    }
-
-    private fun findNestedList(value: Any): MutableList<Any?>? {
-        value.javaClass.declaredFields.forEach { field ->
-            runCatching {
-                field.isAccessible = true
-                val nested = field.get(value)
-                if (nested is MutableList<*>) return nested as MutableList<Any?>
-            }
+            type = type.superclass
         }
         return null
     }
 
-    private fun hookFragmentFallback(xposed: XposedInterface, classLoader: ClassLoader) {
-        val fragment = runCatching { classLoader.loadClass(MAIN_SETTING_FRAGMENT) }.getOrNull() ?: return
-        fragment.declaredMethods.filter { it.name in setOf("doOnCreateView", "onViewCreated", "doOnCreate") }
-            .forEach { method ->
-                method.isAccessible = true
-                synchronized(installedMethods) {
-                    if (!installedMethods.add(method)) return@forEach
+    private fun readCharSequenceFields(value: Any): List<String> {
+        val values = mutableListOf<String>()
+        var type: Class<*>? = value.javaClass
+        while (type != null && type != Any::class.java) {
+            type.declaredFields.forEach { field ->
+                runCatching {
+                    field.isAccessible = true
+                    (field.get(value) as? CharSequence)?.toString()?.let(values::add)
                 }
-                xposed.hook(method)
-                    .setId("qq.main_setting.${method.name}.${method.parameterTypes.size}")
-                    .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
-                    .intercept { chain ->
-                        val result = chain.proceed()
-                        val activity = findActivity(chain.thisObject)
-                        if (activity != null) {
-                            activity.runOnUiThread {
-                                val view = (result as? View) ?: findFragmentView(chain.thisObject)
-                                view?.postDelayed({ injectViewTree(view, activity) }, 120L)
-                            }
-                        }
-                        result
-                    }
             }
+            type = type.superclass
+        }
+        return values
+    }
+
+    private fun markMethod(method: Method): Boolean = synchronized(installedMethods) {
+        installedMethods.add(method)
+    }
+
+    private fun removeInjectedMarker(groups: Any) {
+        synchronized(injectedLists) { injectedLists.remove(groups) }
+    }
+
+    private fun hookFragmentFallback(xposed: XposedInterface, classLoader: ClassLoader): Int {
+        val fragment = runCatching { classLoader.loadClass(MAIN_SETTING_FRAGMENT) }.getOrNull() ?: return 0
+        val method = fragment.declaredMethods.firstOrNull { candidate ->
+            candidate.name == "onViewCreated" &&
+                candidate.parameterTypes.contentEquals(arrayOf(View::class.java, Bundle::class.java))
+        } ?: return 0
+        if (!markMethod(method)) return 0
+        method.isAccessible = true
+        xposed.hook(method)
+            .setId("qq.main_setting.on_view_created")
+            .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+            .intercept { chain ->
+                val result = chain.proceed()
+                val activity = findActivity(chain.thisObject)
+                val view = chain.args.firstOrNull() as? View
+                if (activity != null && view != null) {
+                    activity.runOnUiThread { view.postDelayed({ injectViewTree(view, activity) }, 160L) }
+                }
+                result
+            }
+        return 1
     }
 
     private fun findActivity(value: Any?): Activity? {
         if (value is Activity) return value
         var current: Context? = value as? Context
-        repeat(4) {
+        repeat(6) {
             if (current is Activity) return current
             current = (current as? ContextWrapper)?.baseContext
         }
@@ -238,12 +270,6 @@ internal object QQSettingsEntryHook {
         }.getOrNull()
     }
 
-    private fun findFragmentView(value: Any?): View? = runCatching {
-        value?.javaClass?.methods
-            ?.firstOrNull { it.name == "getView" && it.parameterTypes.isEmpty() }
-            ?.invoke(value) as? View
-    }.getOrNull()
-
     private fun injectViewTree(view: View, activity: Activity) {
         if (!view.isAttachedToWindow || view.findViewWithTag<View>("$TAG.qq_view") != null) return
         val queue = ArrayDeque<ViewGroup>()
@@ -253,7 +279,7 @@ internal object QQSettingsEntryHook {
             if (parent.findViewWithTag<View>("$TAG.qq_view") != null) return
             val row = TextView(activity).apply {
                 tag = "$TAG.qq_view"
-                text = "DAuxiliary 模块设置"
+                text = TITLE
                 textSize = 16f
                 setTextColor(Color.DKGRAY)
                 gravity = Gravity.CENTER_VERTICAL
@@ -264,10 +290,7 @@ internal object QQSettingsEntryHook {
                 }
                 setOnClickListener { HostSettingsDialog.show(activity, AppTarget.QQ) }
             }
-            if (runCatching { parent.addView(row, 0, ViewGroup.MarginLayoutParams(-1, -2)) }.isSuccess) {
-                injectedParents.add(parent)
-                return
-            }
+            if (runCatching { parent.addView(row, 0, ViewGroup.MarginLayoutParams(-1, -2)) }.isSuccess) return
             for (index in 0 until parent.childCount) {
                 (parent.getChildAt(index) as? ViewGroup)?.let(queue::add)
             }

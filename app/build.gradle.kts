@@ -104,7 +104,10 @@ dependencies {
     implementation(libs.miuix.nav)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.miuix.navigationevent)
-
     // Xposed: compile-only, provided by LSPosed at runtime
     compileOnly(libs.xposed.api)
+
+    // DexKit: bundled with the module and used for QQ obfuscated-class lookup.
+    implementation(libs.dexkit)
+
 }
