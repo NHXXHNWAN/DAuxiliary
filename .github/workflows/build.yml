@@ -280,13 +280,65 @@ jobs:
           PY
           )
 
-           response=$(curl --silent --show-error \
-             --request POST \
-             --form "chat_id=${TELEGRAM_CHAT_ID}" \
-             --form "document=@-;filename=dauxiliary-release.apk;type=application/vnd.android.package-archive" \
-             --form-string "caption=${caption}" \
-             --form-string "parse_mode=MarkdownV2" \
-             "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" < "$upload_file")
+          export TELEGRAM_CAPTION="$caption"
+          if ! response=$(UPLOAD_FILE="$upload_file" python3 - <<'PY'
+          import os
+          import sys
+          import urllib.error
+          import urllib.request
+          import uuid
+
+          boundary = "----DAuxiliary" + uuid.uuid4().hex
+          upload_file = os.environ["UPLOAD_FILE"]
+          token = os.environ["TELEGRAM_BOT_TOKEN"]
+          chat_id = os.environ["TELEGRAM_CHAT_ID"]
+          caption = os.environ["TELEGRAM_CAPTION"]
+
+          def text_part(name, value):
+              return (
+                  f"--{boundary}\r\n"
+                  f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+                  f"{value}\r\n"
+              ).encode("utf-8")
+
+          with open(upload_file, "rb") as source:
+              apk = source.read()
+
+          file_part = (
+              f"--{boundary}\r\n"
+              'Content-Disposition: form-data; name="document"; filename="dauxiliary-release.apk"\r\n'
+              "Content-Type: application/vnd.android.package-archive\r\n\r\n"
+          ).encode("ascii") + apk + b"\r\n"
+          body = (
+              text_part("chat_id", chat_id)
+              + file_part
+              + text_part("caption", caption)
+              + text_part("parse_mode", "MarkdownV2")
+              + f"--{boundary}--\r\n".encode("ascii")
+          )
+
+          request = urllib.request.Request(
+              f"https://api.telegram.org/bot{token}/sendDocument",
+              data=body,
+              headers={
+                  "Content-Type": f"multipart/form-data; boundary={boundary}",
+                  "Content-Length": str(len(body)),
+              },
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(request, timeout=120) as result:
+                  sys.stdout.write(result.read().decode("utf-8"))
+          except urllib.error.HTTPError as error:
+              sys.stdout.write(error.read().decode("utf-8", errors="replace"))
+          except Exception as error:
+              sys.stderr.write(f"Telegram HTTP upload failed: {error}\n")
+              raise
+          PY
+          ); then
+            echo "Telegram upload client failed before receiving a response."
+            exit 1
+          fi
           if ! printf '%s' "$response" | python3 -c 'import json,sys; data=json.load(sys.stdin); sys.exit(0 if data.get("ok") else 1)'; then
             echo "Telegram sendDocument failed: $response"
             exit 1
