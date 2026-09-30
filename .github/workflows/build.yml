@@ -240,8 +240,15 @@ jobs:
              ls -l "$apk_file" || true
              exit 1
            fi
-           echo "Uploading APK: $apk_file"
-           stat "$apk_file"
+           upload_file="$RUNNER_TEMP/dauxiliary-release.apk"
+           cp "$apk_file" "$upload_file"
+           if [ ! -s "$upload_file" ]; then
+             echo "Temporary APK copy is missing or empty: $upload_file"
+             exit 1
+           fi
+           dd if="$upload_file" of=/dev/null bs=1 count=1 status=none
+           echo "Uploading APK through curl stdin: $upload_file"
+           stat "$upload_file"
 
           if [ "$EVENT_NAME" = "push" ]; then
             channel="测试版"
@@ -273,13 +280,13 @@ jobs:
           PY
           )
 
-          response=$(curl --silent --show-error \
-            --request POST \
-            --form "chat_id=${TELEGRAM_CHAT_ID}" \
-             --form "document=@${apk_file};type=application/vnd.android.package-archive" \
+           response=$(curl --silent --show-error \
+             --request POST \
+             --form "chat_id=${TELEGRAM_CHAT_ID}" \
+             --form "document=@-;filename=dauxiliary-release.apk;type=application/vnd.android.package-archive" \
              --form-string "caption=${caption}" \
              --form-string "parse_mode=MarkdownV2" \
-            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument")
+             "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" < "$upload_file")
           if ! printf '%s' "$response" | python3 -c 'import json,sys; data=json.load(sys.stdin); sys.exit(0 if data.get("ok") else 1)'; then
             echo "Telegram sendDocument failed: $response"
             exit 1
