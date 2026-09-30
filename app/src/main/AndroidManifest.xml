@@ -49,7 +49,6 @@
 
         <meta-data
             android:name="xposedmodule"
-            android:value="true"
-            tools:replace="android:value" />
+            android:value="true" />
     </application>
 </manifest>

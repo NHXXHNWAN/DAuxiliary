@@ -92,18 +92,21 @@ jobs:
         env:
           TZ: Asia/Shanghai
         run: |
-          # versionName is the calendar date; versionCode is the date and minute.
+          # Stable builds use the calendar version. Test builds append the workflow run
+          # number so every push has a monotonically increasing, detectable version.
           version_name="$(date '+%y.%-m.%-d')"
-          version_code="$(date '+%Y%m%d%H%M')"
+          test_version_name="${version_name}.${GITHUB_RUN_NUMBER}"
+          version_code="$(($(date '+%y%m%d') * 10000 + GITHUB_RUN_NUMBER))"
           short_sha="${GITHUB_SHA:0:7}"
           echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
+          echo "test_version_name=$test_version_name" >> "$GITHUB_OUTPUT"
           echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
           echo "stable_tag=v$version_name" >> "$GITHUB_OUTPUT"
-          echo "test_tag=test-$version_name-$short_sha" >> "$GITHUB_OUTPUT"
-          echo "Generated version: $version_name (versionCode: $version_code)"
+          echo "test_tag=test-$test_version_name-$short_sha" >> "$GITHUB_OUTPUT"
+          echo "Generated version: stable=$version_name test=$test_version_name (versionCode: $version_code)"
 
       - name: Build release APK
-        run: ./gradlew :app:assembleRelease --no-daemon --console=plain -PversionName=${{ steps.release.outputs.version_name }} -PversionCode=${{ steps.release.outputs.version_code }}
+        run: ./gradlew :app:assembleRelease --no-daemon --console=plain -PversionName=${{ github.event_name == 'push' && steps.release.outputs.test_version_name || steps.release.outputs.version_name }} -PversionCode=${{ steps.release.outputs.version_code }}
 
       - name: Upload release APK artifact
         uses: actions/upload-artifact@v5
