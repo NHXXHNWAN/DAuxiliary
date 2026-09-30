@@ -10,7 +10,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
-import androidx.lifecycle.ViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeLifecycleOwner
 
 import androidx.activity.OnBackPressedDispatcherOwner
 import androidx.compose.ui.platform.ComposeView
@@ -31,7 +31,7 @@ internal object QQInProcessSettings {
         if (root.findViewWithTag<View>(VIEW_TAG) != null) return
 
         val composeView = ComposeView(activity).apply {
-            ViewTreeLifecycleOwner.set(this, AlwaysResumedLifecycleOwner())
+            setViewTreeLifecycleOwner(AlwaysResumedLifecycleOwner())
             tag = VIEW_TAG
             setBackgroundColor(Color.TRANSPARENT)
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)

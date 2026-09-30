@@ -5,6 +5,8 @@ import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.core.registry.AppTarget
 import com.dauxiliary.core.xposed.HostEntryHook
 import com.dauxiliary.core.xposed.QQRecallHook
+import com.dauxiliary.core.xposed.QQDexKitResolver
+import com.dauxiliary.core.xposed.HostActivityTracker
 
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModuleInterface
