@@ -268,15 +268,31 @@ jobs:
           export TELEGRAM_VERSION_CODE="$VERSION_CODE"
           caption=$(python3 - <<'PY'
           import os
-          import re
+
           notes = os.environ["TELEGRAM_NOTES"]
+          reserved = set(r"_*[]()~`>#+-=|{}.!\\")
+          plain_lines = []
+          for line in notes.splitlines():
+              unescaped = []
+              index = 0
+              while index < len(line):
+                  if line[index] == "\\" and index + 1 < len(line) and line[index + 1] in reserved:
+                      index += 1
+                  unescaped.append(line[index])
+                  index += 1
+              line = "".join(unescaped)
+              if len(line) >= 2 and line.startswith("*") and line.endswith("*"):
+                  line = line[1:-1]
+              if line.startswith("- "):
+                  line = "• " + line[2:]
+              plain_lines.append(line)
+
+          notes = "\\n".join(plain_lines).strip()
           channel = os.environ["TELEGRAM_CHANNEL"]
           version = os.environ["TELEGRAM_VERSION_NAME"]
           code = os.environ["TELEGRAM_VERSION_CODE"]
           url = os.environ["TELEGRAM_RELEASE_URL"]
-          notes = re.sub(r"([_\\*\\[\\]()~`>#+\\-=|{}.!])", r"\\\\\\1", notes)
-          url = url.replace(")", "\\\\)")
-          print(f'*DAuxiliary {channel}*\\n版本：`{version}`\\nversionCode：`{code}`\\n\\n*更新内容*\\n{notes}\\n\\n[GitHub Release 下载页面]({url})')
+          print(f"DAuxiliary {channel}\\n版本：{version}\\nversionCode：{code}\\n\\n更新内容\\n{notes}\\n\\nGitHub Release 下载页面：{url}")
           PY
           )
 
@@ -313,7 +329,6 @@ jobs:
               text_part("chat_id", chat_id)
               + file_part
               + text_part("caption", caption)
-              + text_part("parse_mode", "MarkdownV2")
               + f"--{boundary}--\r\n".encode("ascii")
           )
 
