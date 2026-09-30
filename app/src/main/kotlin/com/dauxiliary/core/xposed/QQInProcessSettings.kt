@@ -30,8 +30,16 @@ internal object QQInProcessSettings {
         val root = activity.window?.decorView as? ViewGroup ?: return
         if (root.findViewWithTag<View>(VIEW_TAG) != null) return
 
+        // QQ's Activity is not an AndroidX LifecycleOwner. The Compose window
+        // recomposer searches from DecorView, so assigning the owner only to the
+        // new child view is too late and causes a crash during the first measure.
+        val lifecycleOwner = AlwaysResumedLifecycleOwner()
+        root.setViewTreeLifecycleOwner(lifecycleOwner)
+
         val composeView = ComposeView(activity).apply {
-            setViewTreeLifecycleOwner(AlwaysResumedLifecycleOwner())
+            // Keep the owner on the ComposeView as well as DecorView. Some QQ
+            // versions replace the decor root's tag during window setup.
+            setViewTreeLifecycleOwner(lifecycleOwner)
             tag = VIEW_TAG
             setBackgroundColor(Color.TRANSPARENT)
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)

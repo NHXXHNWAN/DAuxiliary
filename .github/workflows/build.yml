@@ -228,11 +228,13 @@ jobs:
             exit 0
           fi
 
-          apk_file=$(find app/build/outputs/apk/release -type f -name '*.apk' | head -n 1)
-          if [ -z "$apk_file" ]; then
-            echo "APK not found"
-            exit 1
-          fi
+           apk_file=$(find app/build/outputs/apk/release -type f -name '*.apk' -print -quit)
+           if [ -z "$apk_file" ] || [ ! -f "$apk_file" ]; then
+             echo "APK not found"
+             find app/build/outputs/apk/release -maxdepth 2 -type f -print || true
+             exit 1
+           fi
+           echo "Uploading APK: $apk_file"
 
           if [ "$EVENT_NAME" = "push" ]; then
             channel="测试版"
