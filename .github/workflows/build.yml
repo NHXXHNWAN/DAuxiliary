@@ -127,13 +127,11 @@ jobs:
             printf '%s\n' "$INPUT_NOTES" > "$notes_file"
           else
             base_sha="${{ github.event.before }}"
-            if [ -z "$base_sha" ] || [ "$base_sha" = "0000000000000000000000000000000000000000" ]; then
-              base_sha="$(git rev-parse HEAD~1 2>/dev/null || true)"
-            fi
-            if [ -n "$base_sha" ]; then
-              commits="$(git log --pretty=%s "$base_sha..${GITHUB_SHA}")"
+            if [ -n "$base_sha" ] && [ "$base_sha" != "0000000000000000000000000000000000000000" ] && git cat-file -e "${base_sha}^{commit}" 2>/dev/null; then
+              commits="$(git log --pretty=%s "${base_sha}..${GITHUB_SHA}")"
             else
-              commits="$(git log -n 12 --pretty=%s)"
+              echo "Previous commit $base_sha is unavailable in this checkout; collecting available commit subjects instead."
+              commits="$(git log -n 12 --pretty=%s "${GITHUB_SHA}")"
             fi
             export RELEASE_COMMIT_SUBJECTS="$commits"
             python3 - <<'PY' > "$notes_file"
