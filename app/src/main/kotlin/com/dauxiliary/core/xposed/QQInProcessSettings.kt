@@ -2,31 +2,51 @@ package com.dauxiliary.core.xposed
 
 import android.app.Activity
 import android.content.Context
-import android.util.Log
-import androidx.fragment.app.FragmentActivity
-import androidx.fragment.app.commit
-import com.dauxiliary.ui.injected.HostSettingsFragment
+import android.graphics.Color
+import android.os.Build
+import android.view.View
+import android.view.ViewGroup
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.OnBackPressedDispatcherOwner
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import com.dauxiliary.core.registry.AppTarget
+import com.dauxiliary.ui.injected.InjectedModuleSettings
+import com.dauxiliary.ui.theme.AppTheme
 
-/** Opens the module UI inside QQ's current native Activity back stack. */
+/** Opens the QQ-specific module UI inside the current QQ Activity. */
 internal object QQInProcessSettings {
-    private const val TAG = "DAuxiliary"
-    private const val TAG_FRAGMENT = "dauxiliary.qq.settings"
+    private const val VIEW_TAG = "dauxiliary.qq.settings.view"
 
     fun open(context: Context, classLoader: ClassLoader) {
-        val activity = findActivity(context)
-        if (activity !is FragmentActivity) {
-            Log.w(TAG, "QQ settings Activity is not FragmentActivity; refusing cross-app navigation")
-            return
+        HostActivityTracker.register(context)
+        val activity = HostActivityTracker.currentActivity() ?: findActivity(context) ?: return
+        if (activity.isFinishing || activity.isDestroyed) return
+        val root = activity.window?.decorView as? ViewGroup ?: return
+        if (root.findViewWithTag<View>(VIEW_TAG) != null) return
+
+        val composeView = ComposeView(activity).apply {
+            tag = VIEW_TAG
+            setBackgroundColor(Color.TRANSPARENT)
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+            setContent { AppTheme { InjectedModuleSettings(AppTarget.QQ) } }
         }
-        runCatching {
-            if (activity.supportFragmentManager.findFragmentByTag(TAG_FRAGMENT) != null) return
-            activity.supportFragmentManager.commit {
-                setReorderingAllowed(true)
-                replace(android.R.id.content, HostSettingsFragment.newInstance(), TAG_FRAGMENT)
-                addToBackStack(TAG_FRAGMENT)
-            }
-        }.onFailure { error ->
-            Log.e(TAG, "Unable to open in-process QQ settings fragment", error)
+        root.addView(composeView, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+
+        if (activity is OnBackPressedDispatcherOwner) {
+            activity.onBackPressedDispatcher.addCallback(
+                activity,
+                object : OnBackPressedCallback(true) {
+                    override fun handleOnBackPressed() {
+                        isEnabled = false
+                        root.removeView(composeView)
+                    }
+                },
+            )
+        } else if (Build.VERSION.SDK_INT >= 33) {
+            activity.onBackInvokedDispatcher.registerOnBackInvokedCallback(
+                android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+            ) { root.removeView(composeView) }
         }
     }
 

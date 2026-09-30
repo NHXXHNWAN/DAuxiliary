@@ -26,7 +26,7 @@ internal fun HostOverviewPage(host: AppTarget) {
         item { SmallTitle(text = host.displayName) }
         item {
             InjectedGroupCard {
-                BasicComponent(title = "DAuxiliary", summary = "${host.displayName}专属模块设置")
+                BasicComponent(title = "DAuxiliary", summary = "${host.displayName}专属功能")
                 BasicComponent(title = "已启用功能", summary = "$enabled 项")
             }
         }

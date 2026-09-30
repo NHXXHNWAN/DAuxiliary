@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.widget.Toast
 import androidx.core.content.FileProvider
@@ -18,10 +20,9 @@ object ApkInstaller {
         withContext(Dispatchers.IO) {
             runCatching {
                 val updateDir = File(context.cacheDir, "updates").apply { mkdirs() }
+                updateDir.listFiles()?.forEach { it.deleteRecursively() }
                 val tempFile = File(updateDir, "dauxiliary-update.apk.part")
                 val apkFile = File(updateDir, "dauxiliary-update.apk")
-                tempFile.delete()
-                apkFile.delete()
                 download(downloadUrl, tempFile)
                 check(tempFile.renameTo(apkFile)) { "无法保存更新包" }
 
@@ -49,6 +50,9 @@ object ApkInstaller {
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             },
                         )
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            updateDir.listFiles()?.forEach { it.deleteRecursively() }
+                        }, 60_000L)
                     }
                 }
                 true

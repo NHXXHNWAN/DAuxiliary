@@ -40,7 +40,6 @@ import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
-import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /** Desktop overview with the module status and enabled host count. */
@@ -54,7 +53,6 @@ fun HomePage(
     val context = LocalContext.current
     val updateScope = rememberCoroutineScope()
     var isDownloading by remember { mutableStateOf(false) }
-    var showReleaseNotes by remember { mutableStateOf(false) }
     val updateChannel = UpdateChannel.entries.getOrElse(updateChannelIndex) { UpdateChannel.STABLE }
     var refresh by remember { mutableIntStateOf(0) }
     var isRefreshing by remember { mutableStateOf(false) }
@@ -158,26 +156,9 @@ fun HomePage(
                                 }
                             }
                         },
-                        onLongClick = { showReleaseNotes = true },
                     )
                 }
             }
-        }
-    }
-
-    preservedUpdate?.let { update ->
-        OverlayBottomSheet(
-            show = showReleaseNotes,
-            title = "${update.channel.label} ${update.latestVersion} 更新内容",
-            onDismissRequest = { showReleaseNotes = false },
-        ) {
-            Text(
-                text = update.releaseNotes,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-                color = MiuixTheme.colorScheme.onSurface,
-                fontSize = 14.sp,
-            )
-            Spacer(Modifier.height(12.dp))
         }
     }
 }

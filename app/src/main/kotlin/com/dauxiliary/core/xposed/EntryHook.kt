@@ -24,6 +24,9 @@ class EntryHook : XposedModule() {
     }
 
     override fun onPackageReady(param: XposedModuleInterface.PackageReadyParam) {
+        if (loadedProcess?.startsWith("com.tencent.mobileqq") == true) {
+            HostActivityTracker.registerCurrentProcess()
+        }
         val target = AppTarget.fromPackageName(param.packageName) ?: return
         val process = loadedProcess
         if (process != null &&

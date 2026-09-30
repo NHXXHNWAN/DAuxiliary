@@ -19,7 +19,7 @@ internal object QQSettingsEntryHook {
         "com.tencent.mobileqq.setting.main.b",
     )
     private const val SIMPLE_PROCESSOR = "com.tencent.mobileqq.setting.processor.i"
-    private const val TITLE = "DAuxiliary 模块设置"
+    private const val TITLE = "DAuxiliary"
 
     private val installedLoaders = Collections.newSetFromMap(WeakHashMap<ClassLoader, Boolean>())
     private val installedMethods = Collections.newSetFromMap(WeakHashMap<Method, Boolean>())
@@ -70,6 +70,7 @@ internal object QQSettingsEntryHook {
     }
 
     private fun injectProviderGroups(result: Any?, context: Context, classLoader: ClassLoader) {
+        HostActivityTracker.register(context)
         val groups = (result as? MutableList<*>)?.let {
             @Suppress("UNCHECKED_CAST")
             it as MutableList<Any?>
