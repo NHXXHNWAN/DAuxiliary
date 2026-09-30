@@ -142,32 +142,36 @@ jobs:
 
           commits = os.environ.get("RELEASE_COMMIT_SUBJECTS", "").splitlines()
           groups = {"增加": [], "修复": [], "优化": [], "变更": []}
+          emoji = re.compile("[\\U0001F000-\\U0001FAFF\\u2600-\\u27BF]")
           for raw in commits:
-              text = raw.strip()
+              text = emoji.sub("", raw.strip())
               if not text:
                   continue
-              text = re.sub(r"[\\U0001F000-\\U0001FAFF\\u2600-\\u27BF]", "", text)
-              text = re.sub(r"^(feat|feature|add|新增|增加)\\s*[:：]\\s*", "", text, flags=re.I)
-              category = "变更"
-              if re.match(r"^(fix|修复|bug)\\s*[:：]", raw, re.I):
-                  category = "修复"
-              elif re.match(r"^(perf|refactor|optimize|优化)\\s*[:：]", raw, re.I):
-                  category = "优化"
-              elif re.match(r"^(feat|feature|add|新增|增加)\\s*[:：]", raw, re.I):
+              match = re.match(r"^(feat|feature|add|新增|增加|fix|bug|修复|perf|refactor|optimize|优化)\\s*[:：]\\s*", text, re.I)
+              prefix = match.group(1).lower() if match else ""
+              if prefix in ("feat", "feature", "add", "新增", "增加"):
                   category = "增加"
-              text = re.sub(r"^(fix|bug|修复|perf|refactor|optimize|优化)\\s*[:：]\\s*", "", text, flags=re.I)
+              elif prefix in ("fix", "bug", "修复"):
+                  category = "修复"
+              elif prefix in ("perf", "refactor", "optimize", "优化"):
+                  category = "优化"
+              else:
+                  category = "变更"
+              if match:
+                  text = text[match.end():]
               text = text.strip(" -:：")
               if text and text not in groups[category]:
                   groups[category].append(text[:100])
           for category in ("增加", "修复", "优化", "变更"):
               if groups[category]:
-                  print(f"### {category}")
+                  print(f"*{category}*")
                   for item in groups[category][:5]:
-                      print(f"- {item}")
+                      escaped = re.sub(r"([_\\*\\[\\]()~`>#+\\-=|{}.!])", r"\\\\\\1", item)
+                      print(f"- {escaped}")
           PY
           fi
           if [ ! -s "$notes_file" ]; then
-            printf '%s\n' '本次版本包含功能调整、问题修复和稳定性优化。' > "$notes_file"
+            printf '%s\n' '*变更*' '- 本次版本包含功能调整、问题修复和稳定性优化。' > "$notes_file"
           fi
           echo "notes_file=$notes_file" >> "$GITHUB_OUTPUT"
 
@@ -242,12 +246,34 @@ jobs:
           release_url="https://github.com/${REPOSITORY}/releases/tag/${release_tag}"
 
           notes=$(cat "$RELEASE_NOTES_FILE")
-          notes=$(printf '%s' "$notes" | sed -E 's/[[:space:]]+$//' | head -c 850)
-          caption=$(printf 'DAuxiliary %s\n版本：%s\nversionCode：%s\n\n更新内容：\n%s\n\n下载页面：\n%s' "$channel" "$VERSION_NAME" "$VERSION_CODE" "$notes" "$release_url")
+          notes=$(printf '%s' "$notes" | sed -E 's/[[:space:]]+$//' | head -c 600)
+          export TELEGRAM_NOTES="$notes"
+          export TELEGRAM_RELEASE_URL="$release_url"
+          export TELEGRAM_CHANNEL="$channel"
+          export TELEGRAM_VERSION_NAME="$VERSION_NAME"
+          export TELEGRAM_VERSION_CODE="$VERSION_CODE"
+          caption=$(python3 - <<'PY'
+          import os
+          import re
+          notes = os.environ["TELEGRAM_NOTES"]
+          channel = os.environ["TELEGRAM_CHANNEL"]
+          version = os.environ["TELEGRAM_VERSION_NAME"]
+          code = os.environ["TELEGRAM_VERSION_CODE"]
+          url = os.environ["TELEGRAM_RELEASE_URL"]
+          notes = re.sub(r"([_\\*\\[\\]()~`>#+\\-=|{}.!])", r"\\\\\\1", notes)
+          url = url.replace(")", "\\\\)")
+          print(f'*DAuxiliary {channel}*\\n版本：`{version}`\\nversionCode：`{code}`\\n\\n*更新内容*\\n{notes}\\n\\n[GitHub Release 下载页面]({url})')
+          PY
+          )
 
-          curl --fail --silent --show-error \
+          response=$(curl --silent --show-error \
             --request POST \
             --form "chat_id=${TELEGRAM_CHAT_ID}" \
             --form "document=@${apk_file}" \
             --form "caption=${caption}" \
-            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument"
+            --form "parse_mode=MarkdownV2" \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument")
+          if ! printf '%s' "$response" | python3 -c 'import json,sys; data=json.load(sys.stdin); sys.exit(0 if data.get("ok") else 1)'; then
+            echo "Telegram sendDocument failed: $response"
+            exit 1
+          fi
