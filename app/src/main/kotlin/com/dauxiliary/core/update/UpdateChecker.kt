@@ -11,7 +11,9 @@ import java.net.URL
  data class UpdateInfo(
 
     val currentVersion: String,
+    val currentVersionCode: Int,
     val latestVersion: String,
+    val latestVersionCode: Int,
     val releaseNotes: String,
     val downloadUrl: String,
     val releaseUrl: String,
@@ -31,27 +33,30 @@ object UpdateChecker {
     private const val TEST_RELEASES_URL = "https://github.com/$REPOSITORY/releases?q=test-"
     private const val USER_AGENT = "DAuxiliary-UpdateChecker"
 
-    suspend fun check(currentVersion: String, channel: UpdateChannel): UpdateInfo? =
+    suspend fun check(currentVersion: String, currentVersionCode: Int, channel: UpdateChannel): UpdateInfo? =
         withContext(Dispatchers.IO) {
             if (channel == UpdateChannel.DISABLED) return@withContext null
             runCatching {
                 when (channel) {
-                    UpdateChannel.STABLE -> checkStable(currentVersion)
-                    UpdateChannel.TEST -> checkTest(currentVersion)
+                    UpdateChannel.STABLE -> checkStable(currentVersion, currentVersionCode)
+                    UpdateChannel.TEST -> checkTest(currentVersion, currentVersionCode)
                     UpdateChannel.DISABLED -> null
                 }
             }.getOrNull()
         }
 
-    private fun checkStable(currentVersion: String): UpdateInfo? {
+    private fun checkStable(currentVersion: String, currentVersionCode: Int): UpdateInfo? {
         val release = request(RELEASES_API) ?: return null
         if (release.optBoolean("draft") || release.optBoolean("prerelease")) return null
         val latestVersion = normalize(release.optString("tag_name"))
         val apkUrl = findApkUrl(release) ?: return null
-        if (latestVersion.isBlank() || compareVersions(latestVersion, currentVersion) <= 0) return null
+        val latestVersionCode = releaseVersionCode(release)
+        if (latestVersion.isBlank() || latestVersionCode <= currentVersionCode) return null
         return UpdateInfo(
             currentVersion = normalize(currentVersion),
+            currentVersionCode = currentVersionCode,
             latestVersion = latestVersion,
+            latestVersionCode = latestVersionCode,
             releaseNotes = release.optString("body").trim()
                 .ifBlank { release.optString("name").trim() }
                 .ifBlank { "该版本暂无更新说明。" },
@@ -62,7 +67,7 @@ object UpdateChecker {
     }
 
     /** Test channel checks both automatic Test prereleases and the latest stable release. */
-    private fun checkTest(currentVersion: String): UpdateInfo? {
+    private fun checkTest(currentVersion: String, currentVersionCode: Int): UpdateInfo? {
         val candidates = mutableListOf<Pair<JSONObject, UpdateChannel>>()
         requestArray(TEST_RELEASES_API)?.let { releases ->
             for (index in 0 until releases.length()) {
@@ -79,16 +84,21 @@ object UpdateChecker {
                 candidates += release to UpdateChannel.STABLE
             }
         }
-        val selected = candidates.maxWithOrNull(compareBy { releaseVersion(it.first) }) ?: return null
+        val eligible = candidates.filter { releaseVersionCode(it.first) > currentVersionCode }
+        val selected = eligible.maxByOrNull { releaseVersionCode(it.first) } ?: return null
         val release = selected.first
         val channel = selected.second
         val latestVersion = releaseVersion(release)
-        if (latestVersion.isBlank() || compareVersions(latestVersion, currentVersion) <= 0) return null
+        val latestVersionCode = releaseVersionCode(release)
+        if (latestVersion.isBlank()) return null
+
         val apkUrl = findApkUrl(release) ?: return null
         val releaseUrl = release.optString("html_url").ifBlank { TEST_RELEASES_URL }
         return UpdateInfo(
             currentVersion = normalize(currentVersion),
+            currentVersionCode = currentVersionCode,
             latestVersion = latestVersion,
+            latestVersionCode = latestVersionCode,
             releaseNotes = compactNotes(
                 release.optString("body"),
                 if (channel == UpdateChannel.TEST) "测试版构建。" else "正式版发布。",
@@ -112,6 +122,12 @@ object UpdateChecker {
         }
         return normalize(version)
     }
+
+    private fun releaseVersionCode(release: JSONObject): Int =
+        Regex("(?i)versionCode\\s*[:=]\\s*(\\d+)")
+            .find(release.optString("body"))
+            ?.groupValues?.getOrNull(1)?.toIntOrNull()
+            ?: release.optInt("version_code", -1)
 
     private fun compactNotes(body: String, fallback: String): String = body
         .lineSequence()

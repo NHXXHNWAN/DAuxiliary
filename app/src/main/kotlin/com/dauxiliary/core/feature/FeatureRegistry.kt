@@ -103,6 +103,13 @@ object FeatureRegistry {
         }
     }
 
+    fun resetForHotReload() {
+        HostEntryHook.resetForHotReload()
+        QQRecallHook.resetForHotReload()
+        QQDexKitResolver.resetForHotReload()
+        HostActivityTracker.resetForHotReload()
+    }
+
     fun setEnabled(context: Context, host: AppTarget, feature: FeatureDefinition, enabled: Boolean) {
         ConfigStore.setFeatureEnabled(context, host, feature.id, enabled)
     }

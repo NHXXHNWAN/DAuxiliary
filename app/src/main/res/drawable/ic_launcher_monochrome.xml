@@ -4,8 +4,7 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Monochrome layer: the launcher applies Monet/system tint. -->
     <path
         android:fillColor="#000000"
-        android:pathData="M40,34 L52,34 C64,34 72,42.5 72,54 C72,65.5 64,74 52,74 L40,74 Z M48,42 L48,66 L52,66 C58.5,66 63,61 63,54 C63,47 58.5,42 52,42 Z" />
+        android:pathData="M18,31 L38,31 C52,31 60,40 60,54 C60,68 52,77 38,77 L18,77 Z M28,40 L28,68 L38,68 C46,68 51,63 51,54 C51,45 46,40 38,40 Z M53,77 L70,31 L81,31 L98,77 L87,77 L83,66 L67,66 L63,77 Z M70,57 L80,57 L75,42 Z" />
 </vector>

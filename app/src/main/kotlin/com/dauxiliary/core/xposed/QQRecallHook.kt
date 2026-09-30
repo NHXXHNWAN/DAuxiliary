@@ -16,6 +16,11 @@ internal object QQRecallHook {
     private val installedLoaders = Collections.newSetFromMap(WeakHashMap<ClassLoader, Boolean>())
     private val installedMethods = Collections.newSetFromMap(WeakHashMap<Method, Boolean>())
 
+    fun resetForHotReload() {
+        synchronized(installedLoaders) { installedLoaders.clear() }
+        synchronized(installedMethods) { installedMethods.clear() }
+    }
+
     fun install(xposed: XposedInterface, classLoader: ClassLoader) {
         synchronized(installedLoaders) {
             if (installedLoaders.contains(classLoader)) return

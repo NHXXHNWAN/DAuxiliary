@@ -62,7 +62,9 @@ class EntryHook : XposedModule() {
     }
 
     override fun onHotReloading(param: XposedModuleInterface.HotReloadingParam): Boolean {
-        log("Hot reload requested")
+        FeatureRegistry.resetForHotReload()
+        loadedProcess = null
+        log("Hot reload state reset")
         return true
     }
 

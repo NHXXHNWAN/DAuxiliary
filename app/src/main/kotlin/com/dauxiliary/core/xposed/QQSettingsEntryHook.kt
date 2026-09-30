@@ -25,6 +25,12 @@ internal object QQSettingsEntryHook {
     private val installedMethods = Collections.newSetFromMap(WeakHashMap<Method, Boolean>())
     private val injectedLists = Collections.newSetFromMap(WeakHashMap<Any, Boolean>())
 
+    fun resetForHotReload() {
+        synchronized(installedLoaders) { installedLoaders.clear() }
+        synchronized(installedMethods) { installedMethods.clear() }
+        synchronized(injectedLists) { injectedLists.clear() }
+    }
+
     fun install(xposed: XposedInterface, classLoader: ClassLoader) {
         synchronized(installedLoaders) {
             if (!installedLoaders.add(classLoader)) return

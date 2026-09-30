@@ -24,6 +24,11 @@ internal object QQDexKitResolver {
     private val started = Collections.newSetFromMap(WeakHashMap<ClassLoader, Boolean>())
     private val resolvedNames = WeakHashMap<ClassLoader, String>()
 
+    fun resetForHotReload() {
+        synchronized(started) { started.clear() }
+        synchronized(resolvedNames) { resolvedNames.clear() }
+    }
+
     fun warmUp(classLoader: ClassLoader) {
         synchronized(started) {
             if (!started.add(classLoader)) return

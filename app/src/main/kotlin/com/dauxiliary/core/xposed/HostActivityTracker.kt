@@ -13,6 +13,13 @@ internal object HostActivityTracker : Application.ActivityLifecycleCallbacks {
     @Volatile
     private var registered = false
 
+    fun resetForHotReload() {
+        synchronized(this) {
+            current.clear()
+            registered = false
+        }
+    }
+
     fun registerCurrentProcess() {
         val application = runCatching {
             Class.forName("android.app.ActivityThread")

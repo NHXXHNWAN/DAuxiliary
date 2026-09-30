@@ -92,11 +92,11 @@ jobs:
         env:
           TZ: Asia/Shanghai
         run: |
-          # Stable builds use the calendar version. Test builds append the workflow run
-          # number so every push has a monotonically increasing, detectable version.
+          # Both channels use the calendar version name; versionCode identifies each build.
           version_name="$(date '+%y.%-m.%-d')"
-          test_version_name="${version_name}.${GITHUB_RUN_NUMBER}"
-          version_code="$(($(date '+%y%m%d') * 10000 + GITHUB_RUN_NUMBER))"
+          test_version_name="${version_name}"
+          # Keep versionCode within Android's signed Int range while changing every CI build.
+          version_code="$(($(date '+%y%m%d') * 1000 + GITHUB_RUN_NUMBER))"
           short_sha="${GITHUB_SHA:0:7}"
           echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
           echo "test_version_name=$test_version_name" >> "$GITHUB_OUTPUT"
@@ -133,8 +133,9 @@ jobs:
             perf:*|refactor:*|优化：*) note="优化：${message#*: }" ;;
             *) note="变更：$message" ;;
           esac
-          printf '%s\n' "$note" > "$notes_file"
+          printf '%s\n\nversionCode: %s\n' "$note" "${{ steps.release.outputs.version_code }}" > "$notes_file"
           gh release create "$release_tag" app/build/outputs/apk/release/*.apk \
+
             --prerelease \
             --title "DAuxiliary 测试版 ${{ steps.release.outputs.version_name }}" \
             --notes-file "$notes_file" \
