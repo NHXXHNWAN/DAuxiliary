@@ -234,7 +234,14 @@ jobs:
              find app/build/outputs/apk/release -maxdepth 2 -type f -print || true
              exit 1
            fi
+           apk_file="$(realpath "$apk_file")"
+           if [ ! -r "$apk_file" ]; then
+             echo "APK is not readable: $apk_file"
+             ls -l "$apk_file" || true
+             exit 1
+           fi
            echo "Uploading APK: $apk_file"
+           stat "$apk_file"
 
           if [ "$EVENT_NAME" = "push" ]; then
             channel="测试版"
@@ -269,9 +276,9 @@ jobs:
           response=$(curl --silent --show-error \
             --request POST \
             --form "chat_id=${TELEGRAM_CHAT_ID}" \
-            --form "document=@${apk_file}" \
-            --form "caption=${caption}" \
-            --form "parse_mode=MarkdownV2" \
+             --form "document=@${apk_file};type=application/vnd.android.package-archive" \
+             --form-string "caption=${caption}" \
+             --form-string "parse_mode=MarkdownV2" \
             "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument")
           if ! printf '%s' "$response" | python3 -c 'import json,sys; data=json.load(sys.stdin); sys.exit(0 if data.get("ok") else 1)'; then
             echo "Telegram sendDocument failed: $response"
