@@ -116,6 +116,61 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Prepare concise release notes
+        id: notes
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        env:
+          INPUT_NOTES: ${{ inputs.release_notes }}
+        run: |
+          notes_file="$RUNNER_TEMP/dauxiliary-release-notes.md"
+          if [ -n "$INPUT_NOTES" ]; then
+            printf '%s\n' "$INPUT_NOTES" > "$notes_file"
+          else
+            base_sha="${{ github.event.before }}"
+            if [ -z "$base_sha" ] || [ "$base_sha" = "0000000000000000000000000000000000000000" ]; then
+              base_sha="$(git rev-parse HEAD~1 2>/dev/null || true)"
+            fi
+            if [ -n "$base_sha" ]; then
+              commits="$(git log --pretty=%s "$base_sha..${GITHUB_SHA}")"
+            else
+              commits="$(git log -n 12 --pretty=%s)"
+            fi
+            export RELEASE_COMMIT_SUBJECTS="$commits"
+            python3 - <<'PY' > "$notes_file"
+          import os
+          import re
+
+          commits = os.environ.get("RELEASE_COMMIT_SUBJECTS", "").splitlines()
+          groups = {"增加": [], "修复": [], "优化": [], "变更": []}
+          for raw in commits:
+              text = raw.strip()
+              if not text:
+                  continue
+              text = re.sub(r"[\\U0001F000-\\U0001FAFF\\u2600-\\u27BF]", "", text)
+              text = re.sub(r"^(feat|feature|add|新增|增加)\\s*[:：]\\s*", "", text, flags=re.I)
+              category = "变更"
+              if re.match(r"^(fix|修复|bug)\\s*[:：]", raw, re.I):
+                  category = "修复"
+              elif re.match(r"^(perf|refactor|optimize|优化)\\s*[:：]", raw, re.I):
+                  category = "优化"
+              elif re.match(r"^(feat|feature|add|新增|增加)\\s*[:：]", raw, re.I):
+                  category = "增加"
+              text = re.sub(r"^(fix|bug|修复|perf|refactor|optimize|优化)\\s*[:：]\\s*", "", text, flags=re.I)
+              text = text.strip(" -:：")
+              if text and text not in groups[category]:
+                  groups[category].append(text[:100])
+          for category in ("增加", "修复", "优化", "变更"):
+              if groups[category]:
+                  print(f"### {category}")
+                  for item in groups[category][:5]:
+                      print(f"- {item}")
+          PY
+          fi
+          if [ ! -s "$notes_file" ]; then
+            printf '%s\n' '本次版本包含功能调整、问题修复和稳定性优化。' > "$notes_file"
+          fi
+          echo "notes_file=$notes_file" >> "$GITHUB_OUTPUT"
+
       # Every push to Test publishes a prerelease consumed by the Test channel.
       # Manual runs additionally publish a stable release consumed by the Stable channel.
       - name: Publish Test prerelease
@@ -125,19 +180,11 @@ jobs:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           release_tag="${{ steps.release.outputs.test_tag }}"
-          notes_file="$RUNNER_TEMP/test-release-notes.md"
-          message="$(printf '%s' "$COMMIT_MESSAGE" | head -n 1 | cut -c1-80)"
-          case "${message,,}" in
-            feat:*|add:*|增加：*) note="增加：${message#*: }" ;;
-            fix:*|修复：*) note="修复：${message#*: }" ;;
-            perf:*|refactor:*|优化：*) note="优化：${message#*: }" ;;
-            *) note="变更：$message" ;;
-          esac
-          printf '%s\n\nversionCode: %s\n' "$note" "${{ steps.release.outputs.version_code }}" > "$notes_file"
+          notes_file="${{ steps.notes.outputs.notes_file }}"
+          printf '\n版本：%s\nversionCode：%s\n' "${{ steps.release.outputs.test_version_name }}" "${{ steps.release.outputs.version_code }}" >> "$notes_file"
           gh release create "$release_tag" app/build/outputs/apk/release/*.apk \
-
             --prerelease \
-            --title "DAuxiliary 测试版 ${{ steps.release.outputs.version_name }}" \
+            --title "DAuxiliary 测试版 ${{ steps.release.outputs.test_version_name }}" \
             --notes-file "$notes_file" \
             --target "$GITHUB_SHA"
 
@@ -154,9 +201,53 @@ jobs:
             --title "DAuxiliary v${{ steps.release.outputs.version_name }}"
             --target "$GITHUB_SHA"
           )
+          notes_file="${{ steps.notes.outputs.notes_file }}"
           if [ -n "$RELEASE_NOTES" ]; then
-            printf '%s\n' "$RELEASE_NOTES" > "$RUNNER_TEMP/release-notes.md"
-            gh release create "${release_args[@]}" --notes-file "$RUNNER_TEMP/release-notes.md"
-          else
-            gh release create "${release_args[@]}" --generate-notes
+            printf '%s\n' "$RELEASE_NOTES" > "$notes_file"
           fi
+          printf '\n版本：%s\nversionCode：%s\n' "${{ steps.release.outputs.version_name }}" "${{ steps.release.outputs.version_code }}" >> "$notes_file"
+          gh release create "${release_args[@]}" --notes-file "$notes_file"
+
+      - name: Send release APK to Telegram
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/Test') || github.event_name == 'workflow_dispatch'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RELEASE_NOTES_FILE: ${{ steps.notes.outputs.notes_file }}
+          VERSION_NAME: ${{ steps.release.outputs.version_name }}
+          VERSION_CODE: ${{ steps.release.outputs.version_code }}
+          TEST_TAG: ${{ steps.release.outputs.test_tag }}
+          STABLE_TAG: ${{ steps.release.outputs.stable_tag }}
+          EVENT_NAME: ${{ github.event_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "Telegram secrets are not configured; skip notification."
+            exit 0
+          fi
+
+          apk_file=$(find app/build/outputs/apk/release -type f -name '*.apk' | head -n 1)
+          if [ -z "$apk_file" ]; then
+            echo "APK not found"
+            exit 1
+          fi
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            channel="测试版"
+            release_tag="$TEST_TAG"
+          else
+            channel="正式版"
+            release_tag="$STABLE_TAG"
+          fi
+          release_url="https://github.com/${REPOSITORY}/releases/tag/${release_tag}"
+
+          notes=$(cat "$RELEASE_NOTES_FILE")
+          notes=$(printf '%s' "$notes" | sed -E 's/[[:space:]]+$//' | head -c 850)
+          caption=$(printf 'DAuxiliary %s\n版本：%s\nversionCode：%s\n\n更新内容：\n%s\n\n下载页面：\n%s' "$channel" "$VERSION_NAME" "$VERSION_CODE" "$notes" "$release_url")
+
+          curl --fail --silent --show-error \
+            --request POST \
+            --form "chat_id=${TELEGRAM_CHAT_ID}" \
+            --form "document=@${apk_file}" \
+            --form "caption=${caption}" \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument"
