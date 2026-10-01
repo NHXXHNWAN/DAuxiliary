@@ -210,12 +210,76 @@ jobs:
           printf '\n版本：%s\nversionCode：%s\n' "${{ steps.release.outputs.version_name }}" "${{ steps.release.outputs.version_code }}" >> "$notes_file"
           gh release create "${release_args[@]}" --notes-file "$notes_file"
 
-      - name: Send release APK to Telegram
-        if: (github.event_name == 'push' && github.ref == 'refs/heads/Test') || github.event_name == 'workflow_dispatch'
+      # Send push notifications only to the configured Telegram channel.
+      # Personal chats are intentionally excluded: use TELEGRAM_CHANNEL_ID only.
+      - name: Notify Telegram channel about push
+        if: github.event_name == 'push' && github.ref == 'refs/heads/Test'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_IDS: ${{ secrets.TELEGRAM_CHAT_IDS }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          COMMIT_AUTHOR: ${{ github.event.head_commit.author.username || github.actor }}
+          COMMIT_URL: ${{ github.event.head_commit.url }}
+          COMMIT_SHA: ${{ github.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHANNEL_ID" ]; then
+            echo "Telegram channel notification secrets are not configured; skip notification."
+            exit 0
+          fi
+          export TELEGRAM_TEXT="$(python3 - <<'PY'
+          import os
+          import json
+          import urllib.request
+
+          message = os.environ.get("COMMIT_MESSAGE", "").strip()
+          author = os.environ.get("COMMIT_AUTHOR", "").strip() or os.environ.get("GITHUB_ACTOR", "")
+          repo = os.environ["REPOSITORY"]
+          detail_url = os.environ.get("COMMIT_URL", "").strip() or f"https://github.com/{repo}/commit/{os.environ['COMMIT_SHA']}"
+          # The update section reflects this push's actual commit message(s).
+          text = (
+              "New push to GitHub!\\n"
+              "更新内容\\n"
+              "```\\n"
+              f"{message or '无提交说明'}\\n"
+              "```\\n"
+              f"by {author}\\n"
+              f"See commit detail [here]({detail_url})"
+          )
+          print(text)
+          PY
+          )"
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          payload = json.dumps({
+              "chat_id": os.environ["TELEGRAM_CHANNEL_ID"],
+              "text": os.environ["TELEGRAM_TEXT"],
+              "parse_mode": "Markdown",
+              "disable_web_page_preview": True,
+          }).encode("utf-8")
+          request = urllib.request.Request(
+              f"https://api.telegram.org/bot{os.environ['TELEGRAM_BOT_TOKEN']}/sendMessage",
+              data=payload,
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              result = json.loads(response.read().decode("utf-8"))
+          if not result.get("ok"):
+              raise SystemExit(f"Telegram notification failed: {result}")
+          print("Telegram channel notification sent.")
+          PY
+
+      # Automatically send the APK only to the Telegram channel.
+      # Personal chat secrets are intentionally not used here.
+      - name: Send release APK to Telegram channel
+        if: github.event_name == 'push' && github.ref == 'refs/heads/Test'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
           RELEASE_NOTES_FILE: ${{ steps.notes.outputs.notes_file }}
           VERSION_NAME: ${{ steps.release.outputs.version_name }}
           VERSION_CODE: ${{ steps.release.outputs.version_code }}
@@ -224,18 +288,11 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           REPOSITORY: ${{ github.repository }}
         run: |
-          if [ -z "$TELEGRAM_BOT_TOKEN" ] || { [ -z "$TELEGRAM_CHAT_IDS" ] && [ -z "$TELEGRAM_CHAT_ID" ]; }; then
-            echo "Telegram secrets are not configured; skip notification."
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHANNEL_ID" ]; then
+            echo "Telegram channel secrets are not configured; skip notification."
             exit 0
           fi
-          # TELEGRAM_CHAT_IDS accepts a comma, semicolon, or newline separated list.
-          # Keep TELEGRAM_CHAT_ID as a backward-compatible single-target fallback.
-          telegram_chat_ids="${TELEGRAM_CHAT_IDS:-$TELEGRAM_CHAT_ID}"
-          telegram_chat_ids=$(printf '%s' "$telegram_chat_ids" | tr ';,' '\n' | sed '/^[[:space:]]*$/d; s/^[[:space:]]*//; s/[[:space:]]*$//')
-          if [ -z "$telegram_chat_ids" ]; then
-            echo "Telegram chat ID list is empty; skip notification."
-            exit 0
-          fi
+          telegram_chat_ids="$TELEGRAM_CHANNEL_ID"
 
            apk_file=$(find app/build/outputs/apk/release -type f -name '*.apk' -print -quit)
            if [ -z "$apk_file" ] || [ ! -f "$apk_file" ]; then
@@ -279,29 +336,24 @@ jobs:
           import os
 
           notes = os.environ["TELEGRAM_NOTES"]
-          reserved = set(r"_*[]()~`>#+-=|{}.!\\")
-          plain_lines = []
+          # Telegram uses MarkdownV2 here. Escape every user/release-note character
+          # instead of mixing GitHub Markdown with Telegram's different grammar.
+          reserved = r"_[]()~`>#+-=|{}.!\\"
+          def escape(text):
+              return "".join("\\\\" + char if char in reserved else char for char in text)
+
+          note_lines = []
           for line in notes.splitlines():
-              unescaped = []
-              index = 0
-              while index < len(line):
-                  if line[index] == "\\" and index + 1 < len(line) and line[index + 1] in reserved:
-                      index += 1
-                  unescaped.append(line[index])
-                  index += 1
-              line = "".join(unescaped)
-              if len(line) >= 2 and line.startswith("*") and line.endswith("*"):
-                  line = line[1:-1]
               if line.startswith("- "):
                   line = "• " + line[2:]
-              plain_lines.append(line)
+              note_lines.append(escape(line))
 
-          notes = "\\n".join(plain_lines).strip()
-          channel = os.environ["TELEGRAM_CHANNEL"]
-          version = os.environ["TELEGRAM_VERSION_NAME"]
-          code = os.environ["TELEGRAM_VERSION_CODE"]
-          url = os.environ["TELEGRAM_RELEASE_URL"]
-          print(f"DAuxiliary {channel}\\n版本：{version}\\nversionCode：{code}\\n\\n更新内容\\n{notes}\\n\\nGitHub Release 下载页面：{url}")
+          notes = "\n".join(note_lines).strip() or "暂无更新说明"
+          channel = escape(os.environ["TELEGRAM_CHANNEL"])
+          version = escape(os.environ["TELEGRAM_VERSION_NAME"])
+          code = escape(os.environ["TELEGRAM_VERSION_CODE"])
+          url = os.environ["TELEGRAM_RELEASE_URL"].replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+          print(f"*DAuxiliary {channel}*\n版本：{version}\nversionCode：{code}\n\n*更新内容*\n{notes}\n\n[GitHub Release 下载页面]({url})")
           PY
           )
 
@@ -343,9 +395,10 @@ jobs:
                   continue
               body = (
                   text_part("chat_id", chat_id)
-                  + file_part
-                  + text_part("caption", caption)
-                  + f"--{boundary}--\r\n".encode("ascii")
+                   + file_part
+                   + text_part("caption", caption)
+                   + text_part("parse_mode", "MarkdownV2")
+                   + f"--{boundary}--\r\n".encode("ascii")
               )
               request = urllib.request.Request(
                   f"https://api.telegram.org/bot{token}/sendDocument",

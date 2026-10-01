@@ -40,6 +40,9 @@ class EntryHook : XposedModule() {
         val remotePreferences = getRemotePreferences(ConfigStore.REMOTE_PREFS_GROUP)
         ConfigStore.attachRemotePreferences(remotePreferences)
 
+        // Keep the QQ settings entry available even when host features are disabled.
+        if (target == AppTarget.QQ) HostEntryHook.install(this, target, param.classLoader)
+
         val selectionInitialized = remotePreferences.getBoolean(
             ConfigStore.KEY_APPLICATION_SELECTION_INITIALIZED,
             false,

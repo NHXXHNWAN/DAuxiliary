@@ -51,6 +51,7 @@ internal object QQSettingsEntryHook {
     private val ACTIVITY_NAMES = listOf(
         "com.tencent.mobileqq.activity.QQSettingSettingActivity",
     )
+    private val ALL_CLASS_NAMES = PROVIDER_NAMES + PROCESSOR_NAMES + FRAGMENT_NAMES + ACTIVITY_NAMES
 
     private val installedLoaders = Collections.newSetFromMap(WeakHashMap<ClassLoader, Boolean>())
     private val installedMethods = Collections.newSetFromMap(WeakHashMap<Method, Boolean>())
