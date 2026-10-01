@@ -4,12 +4,11 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Stylised split D inspired by the supplied reference: a sharp top wedge, heavy stem and separated lower sweep. -->
+    <!-- Original D-orbit mark. It is intentionally not a copy of QAuxiliary/WAuxiliary artwork. -->
     <path
-        android:fillColor="#1C1A1B"
+        android:fillColor="#FFFFFFFF"
         android:fillType="evenOdd"
-        android:pathData="M28,24 H68 L28,64 Z
-            M34,35 H49 C72,35 89,47 96,61 C99,69 96,77 90,83 C81,93 66,99 48,99 H34 Z
-            M50,48 V83 H54 C68,83 78,76 80,65 C81,55 72,48 54,48 Z
-            M59,91 C77,86 92,73 98,57 C100,72 94,87 81,96 C74,100 67,102 59,102 Z" />
+        android:pathData="M31,22 H53 C72,22 87,31 94,45 C99,54 99,65 95,75 C89,91 74,99 54,99 H31 V88 H51 C65,88 75,83 80,73 C85,62 84,51 77,42 C72,36 63,33 52,33 H42 V75 H31 Z
+            M42,42 H53 C63,42 69,47 72,54 C75,61 73,68 68,73 C64,77 59,79 53,79 H42 Z
+            M80,25 H94 L80,39 Z" />
 </vector>
