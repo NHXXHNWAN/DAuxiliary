@@ -27,7 +27,8 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun InjectedModuleSettings(host: AppTarget) {
     val scope = rememberCoroutineScope()
-    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
+    val pageCount = if (host == AppTarget.TELEGRAM) 3 else 2
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { pageCount })
     val surface = MiuixTheme.colorScheme.surface
     val backdrop = rememberLayerBackdrop {
         drawRect(surface)
@@ -38,6 +39,7 @@ fun InjectedModuleSettings(host: AppTarget) {
         listOf(
             NavigationItem("概览", MiuixIcons.Basic.Check),
             NavigationItem("功能", MiuixIcons.Basic.Sidebar),
+            *(if (host == AppTarget.TELEGRAM) listOf(NavigationItem("签到", MiuixIcons.Basic.Check)) else emptyList()).toTypedArray(),
         )
     }
 
@@ -67,6 +69,7 @@ fun InjectedModuleSettings(host: AppTarget) {
                     when (page) {
                         0 -> HostOverviewPage(host)
                         1 -> HostFeaturePage(host)
+                        2 -> TelegramAutoSignPage()
                     }
                 }
             }

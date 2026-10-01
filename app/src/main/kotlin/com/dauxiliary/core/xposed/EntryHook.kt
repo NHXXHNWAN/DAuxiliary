@@ -24,15 +24,23 @@ class EntryHook : XposedModule() {
     }
 
     override fun onPackageReady(param: XposedModuleInterface.PackageReadyParam) {
-        if (loadedProcess?.startsWith("com.tencent.mobileqq") == true) {
+        if (loadedProcess?.let { process ->
+                AppTarget.fromPackageName(process.substringBefore(':')) != null
+            } == true) {
             HostActivityTracker.registerCurrentProcess()
         }
-        val target = AppTarget.fromPackageName(param.packageName) ?: return
+        val knownTarget = AppTarget.fromPackageName(param.packageName)
+        val target = knownTarget
+            ?: if (TelegramHostSupport.isSupported(param.packageName, param.classLoader)) AppTarget.TELEGRAM else return
         val process = loadedProcess
-        if (process != null &&
-            process != target.packageName &&
-            !process.startsWith("${target.packageName}:")
-        ) {
+        val processMatchesTarget = if (knownTarget != null) {
+            process == null || target.matchesProcess(process)
+        } else {
+            // A renamed Telegram-Android fork is accepted by marker detection.
+            // Its base package must still match the package currently being readied.
+            process == null || process.substringBefore(':') == param.packageName
+        }
+        if (!processMatchesTarget) {
             log("Skip ${target.displayName}: non-host process $process")
             return
         }
@@ -40,8 +48,8 @@ class EntryHook : XposedModule() {
         val remotePreferences = getRemotePreferences(ConfigStore.REMOTE_PREFS_GROUP)
         ConfigStore.attachRemotePreferences(remotePreferences)
 
-        // Keep the QQ settings entry available even when host features are disabled.
-        if (target == AppTarget.QQ) HostEntryHook.install(this, target, param.classLoader)
+        // Keep native host entry hooks available even when host features are disabled.
+        HostEntryHook.install(this, target, param.classLoader)
 
         val selectionInitialized = remotePreferences.getBoolean(
             ConfigStore.KEY_APPLICATION_SELECTION_INITIALIZED,

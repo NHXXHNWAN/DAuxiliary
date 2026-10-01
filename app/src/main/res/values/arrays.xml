@@ -4,5 +4,15 @@
         <item>com.ss.android.ugc.aweme</item>
         <item>com.tencent.mm</item>
         <item>com.tencent.mobileqq</item>
+        <item>org.telegram.messenger</item>
+        <item>org.telegram.messenger.web</item>
+        <item>fork.risin42.nagramx</item>
+        <item>nu.gpu.nagram</item>
+        <item>nu.gpu.nagramx</item>
+        <item>nu.gpu.nagram.web</item>
+        <item>com.exteraless.app</item>
+        <item>xyz.nextalone.nagram</item>
+        <item>tw.nekomimi.nekogram</item>
+        <item>it.belloworld.mercurygram</item>
     </string-array>
 </resources>

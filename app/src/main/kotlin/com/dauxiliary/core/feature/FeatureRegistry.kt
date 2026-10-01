@@ -8,6 +8,7 @@ import com.dauxiliary.core.xposed.QQRecallHook
 import com.dauxiliary.core.xposed.QQPokeEffectHook
 import com.dauxiliary.core.xposed.QQDexKitResolver
 import com.dauxiliary.core.xposed.HostActivityTracker
+import com.dauxiliary.core.telegram.TelegramAutoSignHook
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModuleInterface
 
@@ -21,6 +22,22 @@ object FeatureRegistry {
             category = FeatureCategory.HOME,
             hosts = AppTarget.entries.toSet(),
             implemented = true,
+        ),
+        FeatureDefinition(
+            id = "telegram.host_support",
+            title = "Telegram 宿主支持",
+            summary = "识别 Telegram 官方版、官网版及已适配的第三方客户端。",
+            category = FeatureCategory.DEBUG,
+            hosts = setOf(AppTarget.TELEGRAM),
+            implemented = true,
+        ),
+        FeatureDefinition(
+            id = TelegramAutoSignHook.FEATURE_ID,
+            title = "Telegram 自动签到",
+            summary = "观察型接入与管理页已加入；自动发送、结果闭环和调度尚未实现。",
+            category = FeatureCategory.CHAT,
+            hosts = setOf(AppTarget.TELEGRAM),
+            implemented = false,
         ),
         FeatureDefinition(
             id = QQRecallHook.FEATURE_ID,
@@ -62,6 +79,10 @@ object FeatureRegistry {
         // Keep the in-host entry available as the recovery path for feature configuration.
         HostEntryHook.install(xposed, host, packageParam.classLoader)
 
+        if (host == AppTarget.TELEGRAM && ConfigStore.isFeatureEnabledInHookedProcess(host, TelegramAutoSignHook.FEATURE_ID)) {
+            TelegramAutoSignHook.install(xposed, packageParam.classLoader, packageParam.packageName)
+        }
+
         if (host == AppTarget.QQ) {
             if (ConfigStore.isFeatureEnabledInHookedProcess(host, QQRecallHook.FEATURE_ID)) {
                 QQRecallHook.install(xposed, packageParam.classLoader)
@@ -78,6 +99,7 @@ object FeatureRegistry {
         QQPokeEffectHook.resetForHotReload()
         QQDexKitResolver.resetForHotReload()
         HostActivityTracker.resetForHotReload()
+        TelegramAutoSignHook.resetForHotReload()
     }
 
     fun setEnabled(context: Context, host: AppTarget, feature: FeatureDefinition, enabled: Boolean) {
