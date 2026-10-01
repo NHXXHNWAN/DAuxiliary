@@ -340,7 +340,7 @@ jobs:
           # instead of mixing GitHub Markdown with Telegram's different grammar.
           reserved = r"_[]()~`>#+-=|{}.!\\"
           def escape(text):
-              return "".join("\\\\" + char if char in reserved else char for char in text)
+              return "".join("\\" + char if char in reserved else char for char in text)
 
           note_lines = []
           for line in notes.splitlines():
