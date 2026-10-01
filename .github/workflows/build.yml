@@ -214,6 +214,7 @@ jobs:
         if: (github.event_name == 'push' && github.ref == 'refs/heads/Test') || github.event_name == 'workflow_dispatch'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_IDS: ${{ secrets.TELEGRAM_CHAT_IDS }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           RELEASE_NOTES_FILE: ${{ steps.notes.outputs.notes_file }}
           VERSION_NAME: ${{ steps.release.outputs.version_name }}
@@ -223,8 +224,16 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           REPOSITORY: ${{ github.repository }}
         run: |
-          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || { [ -z "$TELEGRAM_CHAT_IDS" ] && [ -z "$TELEGRAM_CHAT_ID" ]; }; then
             echo "Telegram secrets are not configured; skip notification."
+            exit 0
+          fi
+          # TELEGRAM_CHAT_IDS accepts a comma, semicolon, or newline separated list.
+          # Keep TELEGRAM_CHAT_ID as a backward-compatible single-target fallback.
+          telegram_chat_ids="${TELEGRAM_CHAT_IDS:-$TELEGRAM_CHAT_ID}"
+          telegram_chat_ids=$(printf '%s' "$telegram_chat_ids" | tr ';,' '\n' | sed '/^[[:space:]]*$/d; s/^[[:space:]]*//; s/[[:space:]]*$//')
+          if [ -z "$telegram_chat_ids" ]; then
+            echo "Telegram chat ID list is empty; skip notification."
             exit 0
           fi
 
@@ -296,8 +305,9 @@ jobs:
           PY
           )
 
+          export TELEGRAM_CHAT_IDS="$telegram_chat_ids"
           export TELEGRAM_CAPTION="$caption"
-          if ! response=$(UPLOAD_FILE="$upload_file" python3 - <<'PY'
+          response=$(UPLOAD_FILE="$upload_file" python3 - <<'PY'
           import os
           import sys
           import urllib.error
@@ -307,7 +317,7 @@ jobs:
           boundary = "----DAuxiliary" + uuid.uuid4().hex
           upload_file = os.environ["UPLOAD_FILE"]
           token = os.environ["TELEGRAM_BOT_TOKEN"]
-          chat_id = os.environ["TELEGRAM_CHAT_ID"]
+          chat_ids = os.environ["TELEGRAM_CHAT_IDS"].splitlines()
           caption = os.environ["TELEGRAM_CAPTION"]
 
           def text_part(name, value):
@@ -325,36 +335,46 @@ jobs:
               'Content-Disposition: form-data; name="document"; filename="dauxiliary-release.apk"\r\n'
               "Content-Type: application/vnd.android.package-archive\r\n\r\n"
           ).encode("ascii") + apk + b"\r\n"
-          body = (
-              text_part("chat_id", chat_id)
-              + file_part
-              + text_part("caption", caption)
-              + f"--{boundary}--\r\n".encode("ascii")
-          )
 
-          request = urllib.request.Request(
-              f"https://api.telegram.org/bot{token}/sendDocument",
-              data=body,
-              headers={
-                  "Content-Type": f"multipart/form-data; boundary={boundary}",
-                  "Content-Length": str(len(body)),
-              },
-              method="POST",
-          )
-          try:
-              with urllib.request.urlopen(request, timeout=120) as result:
-                  sys.stdout.write(result.read().decode("utf-8"))
-          except urllib.error.HTTPError as error:
-              sys.stdout.write(error.read().decode("utf-8", errors="replace"))
-          except Exception as error:
-              sys.stderr.write(f"Telegram HTTP upload failed: {error}\n")
-              raise
+          failed = False
+          for chat_id in chat_ids:
+              chat_id = chat_id.strip()
+              if not chat_id:
+                  continue
+              body = (
+                  text_part("chat_id", chat_id)
+                  + file_part
+                  + text_part("caption", caption)
+                  + f"--{boundary}--\r\n".encode("ascii")
+              )
+              request = urllib.request.Request(
+                  f"https://api.telegram.org/bot{token}/sendDocument",
+                  data=body,
+                  headers={
+                      "Content-Type": f"multipart/form-data; boundary={boundary}",
+                      "Content-Length": str(len(body)),
+                  },
+                  method="POST",
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=120) as result:
+                      payload = result.read().decode("utf-8")
+              except urllib.error.HTTPError as error:
+                  payload = error.read().decode("utf-8", errors="replace")
+              except Exception as error:
+                  print(f"Telegram upload failed for destination {chat_id}: {error}", file=sys.stderr)
+                  failed = True
+                  continue
+              try:
+                  import json
+                  data = json.loads(payload)
+              except Exception:
+                  data = {"ok": False}
+              if data.get("ok"):
+                  print(f"Telegram upload succeeded for destination {chat_id}")
+              else:
+                  print(f"Telegram upload failed for destination {chat_id}: {payload}", file=sys.stderr)
+                  failed = True
+          sys.exit(1 if failed else 0)
           PY
-          ); then
-            echo "Telegram upload client failed before receiving a response."
-            exit 1
-          fi
-          if ! printf '%s' "$response" | python3 -c 'import json,sys; data=json.load(sys.stdin); sys.exit(0 if data.get("ok") else 1)'; then
-            echo "Telegram sendDocument failed: $response"
-            exit 1
-          fi
+          )
