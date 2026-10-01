@@ -5,9 +5,9 @@ import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.core.registry.AppTarget
 import com.dauxiliary.core.xposed.HostEntryHook
 import com.dauxiliary.core.xposed.QQRecallHook
+import com.dauxiliary.core.xposed.QQPokeEffectHook
 import com.dauxiliary.core.xposed.QQDexKitResolver
 import com.dauxiliary.core.xposed.HostActivityTracker
-
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModuleInterface
 
@@ -23,51 +23,17 @@ object FeatureRegistry {
             implemented = true,
         ),
         FeatureDefinition(
-            id = "privacy.hide_online_status",
-            title = "隐私状态增强",
-            summary = "隐私状态增强。",
-            category = FeatureCategory.PRIVACY,
-            hosts = AppTarget.entries.toSet(),
-        ),
-        FeatureDefinition(
-            id = "beautify.clean_home",
-            title = "主页界面整理",
-            summary = "按宿主应用提供界面整理与入口优化。",
-            category = FeatureCategory.BEAUTIFY,
-            hosts = AppTarget.entries.toSet(),
-        ),
-        FeatureDefinition(
-            id = "debug.verbose_log",
-            title = "详细日志",
-            summary = "记录模块加载、宿主识别和功能状态变化。",
-            category = FeatureCategory.DEBUG,
-            hosts = AppTarget.entries.toSet(),
-        ),
-        FeatureDefinition(
-            id = "wechat.chat_tools",
-            title = "微信聊天辅助",
-            summary = "微信聊天辅助。",
-            category = FeatureCategory.CHAT,
-            hosts = setOf(AppTarget.WECHAT),
-        ),
-        FeatureDefinition(
-            id = "douyin.content_tools",
-            title = "抖音内容辅助",
-            summary = "抖音内容辅助。",
-            category = FeatureCategory.HOME,
-            hosts = setOf(AppTarget.DOUYIN),
-        ),
-        FeatureDefinition(
-            id = "qq.chat_tools",
-            title = "QQ 聊天辅助",
-            summary = "QQ 聊天辅助功能集合。",
-            category = FeatureCategory.CHAT,
-            hosts = setOf(AppTarget.QQ),
-        ),
-        FeatureDefinition(
             id = QQRecallHook.FEATURE_ID,
             title = "QQ 防撤回",
-            summary = "拦截已确认的 QQNT 私聊与群聊撤回推送；未知消息保持 QQ 原始行为。",
+            summary = "拦截已识别的 QQNT 私聊与群聊撤回推送；其他消息保持 QQ 原始行为。",
+            category = FeatureCategory.CHAT,
+            hosts = setOf(AppTarget.QQ),
+            implemented = true,
+        ),
+        FeatureDefinition(
+            id = QQPokeEffectHook.FEATURE_ID,
+            title = "关闭戳一戳动画",
+            summary = "关闭已识别的 QQ 戳一戳效果；未匹配版本保持原始行为。",
             category = FeatureCategory.CHAT,
             hosts = setOf(AppTarget.QQ),
             implemented = true,
@@ -93,21 +59,23 @@ object FeatureRegistry {
         packageParam: XposedModuleInterface.PackageReadyParam,
         host: AppTarget,
     ) {
-        // The in-host entry is the recovery path for configuring the module. Do not
-        // gate it behind a possibly stale per-feature set; otherwise a missing entry
-        // makes the feature impossible to re-enable from the host.
+        // Keep the in-host entry available as the recovery path for feature configuration.
         HostEntryHook.install(xposed, host, packageParam.classLoader)
 
-        if (host == AppTarget.QQ &&
-            ConfigStore.isFeatureEnabledInHookedProcess(host, QQRecallHook.FEATURE_ID)
-        ) {
-            QQRecallHook.install(xposed, packageParam.classLoader)
+        if (host == AppTarget.QQ) {
+            if (ConfigStore.isFeatureEnabledInHookedProcess(host, QQRecallHook.FEATURE_ID)) {
+                QQRecallHook.install(xposed, packageParam.classLoader)
+            }
+            if (ConfigStore.isFeatureEnabledInHookedProcess(host, QQPokeEffectHook.FEATURE_ID)) {
+                QQPokeEffectHook.install(xposed, packageParam.classLoader)
+            }
         }
     }
 
     fun resetForHotReload() {
         HostEntryHook.resetForHotReload()
         QQRecallHook.resetForHotReload()
+        QQPokeEffectHook.resetForHotReload()
         QQDexKitResolver.resetForHotReload()
         HostActivityTracker.resetForHotReload()
     }
