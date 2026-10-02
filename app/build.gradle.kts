@@ -12,6 +12,8 @@ android {
 
     defaultConfig {
         applicationId = "com.dauxiliary"
+        // Keep the LibXposed entry reachable for XP102-compatible loaders.
+        multiDexKeepProguard = file("multidex-keep.pro")
         // miuix-blur-android 0.9.4-rc01 declares minSdk 33.
         minSdk = 33
         targetSdk = 37

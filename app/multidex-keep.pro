@@ -1,0 +1,1 @@
+-keep class com.dauxiliary.core.xposed.EntryHook { *; }

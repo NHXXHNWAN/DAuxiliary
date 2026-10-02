@@ -43,6 +43,12 @@
             android:exported="true"
             android:grantUriPermissions="false" />
 
+        <!-- Keep the LibXposed entry reachable for XP102 loaders that inspect classes.dex first. -->
+        <provider
+            android:name=".core.xposed.PrimaryDexAnchor"
+            android:authorities="${applicationId}.primary-dex-anchor"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
