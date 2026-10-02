@@ -9,13 +9,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+//
+
 import com.dauxiliary.core.telegram.TelegramAuthorization
 import com.dauxiliary.core.telegram.TelegramPrefs
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.SmallTitle
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import top.yukonga.miuix.kmp.basic.Text
 
 /** Telegram-only management page. Authorization is the only host-specific gate. */
@@ -34,6 +37,20 @@ internal fun TelegramAutoSignPage() {
         item { SmallTitle(text = "授权状态") }
         item {
             InjectedGroupCard {
+                BasicComponent(title = "授权接口地址")
+                BasicTextField(
+                    value = endpoint,
+                    onValueChange = { endpoint = it },
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    decorationBox = { inner -> androidx.compose.foundation.layout.Box { if (endpoint.isEmpty()) Text("https://your-worker.example/auth/verify"); inner() } },
+                )
+                BasicComponent(title = "Telegram 数字用户 ID")
+                BasicTextField(
+                    value = userId,
+                    onValueChange = { userId = it.filter(Char::isDigit) },
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    decorationBox = { inner -> androidx.compose.foundation.layout.Box { if (userId.isEmpty()) Text("例如：123456789"); inner() } },
+                )
                 BasicComponent(
                     title = if (authorized) "已授权" else "未授权",
                     summary = if (authorized) "Telegram 功能 Hook 将正常加载。" else "未授权时仅保留入口，Telegram 功能 Hook 不会加载。",
