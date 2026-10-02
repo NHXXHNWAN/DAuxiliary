@@ -1,13 +1,11 @@
 package com.dauxiliary.core.feature
 
-import android.content.Context
-import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.core.registry.AppTarget
-import com.dauxiliary.core.xposed.HostEntryHook
-import com.dauxiliary.core.xposed.QQRecallHook
-import com.dauxiliary.core.xposed.QQPokeEffectHook
-import com.dauxiliary.core.xposed.QQDexKitResolver
 import com.dauxiliary.core.xposed.HostActivityTracker
+import com.dauxiliary.core.xposed.HostEntryHook
+import com.dauxiliary.core.xposed.QQDexKitResolver
+import com.dauxiliary.core.xposed.QQPokeEffectHook
+import com.dauxiliary.core.xposed.QQRecallHook
 import com.dauxiliary.core.telegram.TelegramAutoSignHook
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModuleInterface
@@ -34,7 +32,7 @@ object FeatureRegistry {
         FeatureDefinition(
             id = TelegramAutoSignHook.FEATURE_ID,
             title = "Telegram 自动签到",
-            summary = "观察型接入与管理页已加入；自动发送、结果闭环和调度尚未实现。",
+            summary = "Telegram-Android 客户端的签到观察与接入能力。",
             category = FeatureCategory.CHAT,
             hosts = setOf(AppTarget.TELEGRAM),
             implemented = false,
@@ -62,34 +60,25 @@ object FeatureRegistry {
     fun categoriesFor(host: AppTarget): List<FeatureCategory> =
         featuresFor(host).map { it.category }.distinct()
 
-    fun isEnabled(context: Context, host: AppTarget, feature: FeatureDefinition): Boolean =
-        ConfigStore.enabledFeatureIds(context, host).contains(feature.id)
-
-    fun isEnabled(context: Context, host: AppTarget, featureId: String): Boolean =
-        ConfigStore.enabledFeatureIds(context, host).contains(featureId)
-
-    fun enabledCount(context: Context, host: AppTarget): Int =
-        featuresFor(host).count { it.implemented && isEnabled(context, host, it) }
+    /** Every registered feature is treated as permanently enabled. */
+    fun enabledCount(host: AppTarget): Int =
+        featuresFor(host).count { it.implemented }
 
     fun dispatch(
         xposed: XposedInterface,
         packageParam: XposedModuleInterface.PackageReadyParam,
         host: AppTarget,
     ) {
-        // Keep the in-host entry available as the recovery path for feature configuration.
+        // All recognized hosts are active; there are no user-controlled feature gates.
         HostEntryHook.install(xposed, host, packageParam.classLoader)
 
-        if (host == AppTarget.TELEGRAM && ConfigStore.isFeatureEnabledInHookedProcess(host, TelegramAutoSignHook.FEATURE_ID)) {
+        if (host == AppTarget.TELEGRAM) {
             TelegramAutoSignHook.install(xposed, packageParam.classLoader, packageParam.packageName)
         }
 
         if (host == AppTarget.QQ) {
-            if (ConfigStore.isFeatureEnabledInHookedProcess(host, QQRecallHook.FEATURE_ID)) {
-                QQRecallHook.install(xposed, packageParam.classLoader)
-            }
-            if (ConfigStore.isFeatureEnabledInHookedProcess(host, QQPokeEffectHook.FEATURE_ID)) {
-                QQPokeEffectHook.install(xposed, packageParam.classLoader)
-            }
+            QQRecallHook.install(xposed, packageParam.classLoader)
+            QQPokeEffectHook.install(xposed, packageParam.classLoader)
         }
     }
 
@@ -100,9 +89,5 @@ object FeatureRegistry {
         QQDexKitResolver.resetForHotReload()
         HostActivityTracker.resetForHotReload()
         TelegramAutoSignHook.resetForHotReload()
-    }
-
-    fun setEnabled(context: Context, host: AppTarget, feature: FeatureDefinition, enabled: Boolean) {
-        ConfigStore.setFeatureEnabled(context, host, feature.id, enabled)
     }
 }

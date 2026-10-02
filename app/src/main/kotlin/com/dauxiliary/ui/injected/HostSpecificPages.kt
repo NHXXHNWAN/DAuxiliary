@@ -3,12 +3,7 @@ package com.dauxiliary.ui.injected
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.dauxiliary.BuildConfig
 import com.dauxiliary.core.feature.FeatureDefinition
@@ -16,18 +11,16 @@ import com.dauxiliary.core.feature.FeatureRegistry
 import com.dauxiliary.core.registry.AppTarget
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.SmallTitle
-import top.yukonga.miuix.kmp.preference.SwitchPreference
 
 @Composable
 internal fun HostOverviewPage(host: AppTarget) {
-    val context = LocalContext.current
-    val enabled = FeatureRegistry.enabledCount(context, host)
+    val enabled = FeatureRegistry.enabledCount(host)
     InjectedGroupedPage(title = "${host.displayName}设置") {
         item { SmallTitle(text = host.displayName) }
         item {
             InjectedGroupCard {
                 BasicComponent(title = "DAuxiliary", summary = "${host.displayName}专属功能")
-                BasicComponent(title = "已启用功能", summary = "$enabled 项")
+                BasicComponent(title = "已启用功能", summary = "$enabled 项（常驻启用）")
             }
         }
         item { SmallTitle(text = "模块") }
@@ -49,7 +42,7 @@ internal fun HostFeaturePage(host: AppTarget) {
                 item { SmallTitle(text = category.title) }
                 item {
                     InjectedGroupCard {
-                        features.forEach { feature -> HostFeaturePreference(host, feature) }
+                        features.forEach { feature -> HostFeatureItem(feature) }
                     }
                 }
             }
@@ -58,19 +51,10 @@ internal fun HostFeaturePage(host: AppTarget) {
 }
 
 @Composable
-private fun HostFeaturePreference(host: AppTarget, feature: FeatureDefinition) {
-    val context = LocalContext.current
-    var enabled by rememberSaveable(host.name, feature.id) {
-        mutableStateOf(FeatureRegistry.isEnabled(context, host, feature))
-    }
-    SwitchPreference(
+private fun HostFeatureItem(feature: FeatureDefinition) {
+    BasicComponent(
         title = feature.title,
-        summary = feature.summary,
-        checked = enabled,
-        onCheckedChange = {
-            enabled = it
-            FeatureRegistry.setEnabled(context, host, feature, it)
-        },
+        summary = "${feature.summary} · 常驻启用",
     )
 }
 

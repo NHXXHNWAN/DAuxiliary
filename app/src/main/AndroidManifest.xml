@@ -5,19 +5,14 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <queries>
+        <!-- Visibility for installed launcher apps, including Telegram forks with unknown IDs. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
         <package android:name="com.ss.android.ugc.aweme" />
         <package android:name="com.tencent.mm" />
         <package android:name="com.tencent.mobileqq" />
-        <package android:name="org.telegram.messenger" />
-        <package android:name="org.telegram.messenger.web" />
-        <package android:name="fork.risin42.nagramx" />
-        <package android:name="nu.gpu.nagram" />
-        <package android:name="nu.gpu.nagramx" />
-        <package android:name="nu.gpu.nagram.web" />
-        <package android:name="com.exteraless.app" />
-        <package android:name="xyz.nextalone.nagram" />
-        <package android:name="tw.nekomimi.nekogram" />
-        <package android:name="it.belloworld.mercurygram" />
     </queries>
 
     <application

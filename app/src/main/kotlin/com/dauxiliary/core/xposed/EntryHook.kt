@@ -50,25 +50,11 @@ class EntryHook : XposedModule() {
 
         // Keep native host entry hooks available even when host features are disabled.
         HostEntryHook.install(this, target, param.classLoader)
-
-        val selectionInitialized = remotePreferences.getBoolean(
-            ConfigStore.KEY_APPLICATION_SELECTION_INITIALIZED,
-            false,
-        )
-        val enabledApplications = if (selectionInitialized) {
-            remotePreferences
-                .getStringSet(ConfigStore.KEY_ENABLED_APPLICATIONS, ConfigStore.defaultEnabledApplications())
-                .orEmpty()
-        } else {
-            ConfigStore.defaultEnabledApplications()
-        }
-        log("Package ready: ${target.displayName} (${param.packageName}), selectionInitialized=$selectionInitialized, enabled=${target.packageName in enabledApplications}")
-        if (target.packageName !in enabledApplications) {
-            log("Skip ${target.displayName}: host is disabled in module settings")
-            return
-        }
+        // Every recognized host is active; host-level enable switches are intentionally removed.
+        log("Package ready: ${target.displayName} (${param.packageName}), enabled=true")
 
         FeatureRegistry.dispatch(this, param, target)
+
         log("Feature dispatch completed for ${target.displayName}")
     }
 

@@ -16,7 +16,8 @@ enum class AppTarget(
     QQ("com.tencent.mobileqq", "QQ"),
     TELEGRAM(
         packageName = "org.telegram.messenger",
-        displayName = "Telegram 客户端",
+        displayName = "Telegram",
+
         aliases = setOf(
             // Telegram 官方发行版
             "org.telegram.messenger.web",

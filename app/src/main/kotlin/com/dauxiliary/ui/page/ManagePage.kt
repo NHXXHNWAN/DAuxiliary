@@ -1,10 +1,13 @@
 package com.dauxiliary.ui.page
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,122 +17,166 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
-import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.core.registry.AppTarget
+import com.dauxiliary.core.telegram.TelegramClientDiscovery
+import com.dauxiliary.core.xposed.XposedScopeManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
-import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.SmallTitle
-import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.basic.Sidebar
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-/** Host application switches and installation status. */
+private data class ManagedHostApp(
+    val packageName: String,
+    val displayName: String,
+    val applicationInfo: ApplicationInfo,
+    val isTelegramClient: Boolean,
+)
+
+/** Shows installed host apps only. Integrations are always on; no host enable switches. */
 @Composable
 fun ManagePage() {
-    val context = LocalContext.current
+    val context = LocalContext.current.applicationContext
+    var refreshKey by remember { mutableIntStateOf(0) }
+    var fixedHosts by remember { mutableStateOf<List<ManagedHostApp>>(emptyList()) }
+    var telegramClients by remember { mutableStateOf<List<ManagedHostApp>>(emptyList()) }
+
+    DisposableEffect(context) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                refreshKey++
+            }
+        }
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED)
+            addDataScheme("package")
+        }
+        context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        onDispose { runCatching { context.unregisterReceiver(receiver) } }
+    }
+
+    LaunchedEffect(context, refreshKey) {
+        val detected = withContext(Dispatchers.IO) {
+            val packageManager = context.packageManager
+            val fixed = AppTarget.entries
+                .filter { it != AppTarget.TELEGRAM }
+                .mapNotNull { target ->
+                    val info = packageManager.hostApplicationInfo(target.packageName) ?: return@mapNotNull null
+                    ManagedHostApp(
+                        packageName = target.packageName,
+                        displayName = packageManager.getApplicationLabel(info).toString(),
+                        applicationInfo = info,
+                        isTelegramClient = false,
+                    )
+                }
+            val telegram = TelegramClientDiscovery.findInstalledClients(context).map { client ->
+                ManagedHostApp(
+                    packageName = client.packageName,
+                    displayName = client.displayName,
+                    applicationInfo = client.applicationInfo,
+                    isTelegramClient = true,
+                )
+            }
+            fixed to telegram
+        }
+        fixedHosts = detected.first
+        telegramClients = detected.second.sortedBy { it.displayName.lowercase() }
+        XposedScopeManager.requestScope(telegramClients.mapTo(linkedSetOf()) { it.packageName })
+    }
+
     GroupedPage(title = "管理") {
-        item(key = "manage_title") { SmallTitle(text = "宿主应用") }
-        AppTarget.entries.forEach { target ->
-            item(key = "host_${target.packageName}") {
-                HostApplicationCard(context, target)
+        item(key = "manage_hosts_title") { SmallTitle(text = "宿主应用") }
+        if (fixedHosts.isEmpty()) {
+            item(key = "manage_fixed_empty") {
+                BasicComponent(title = "暂无已安装的宿主应用", summary = "安装支持的应用后会自动识别并常驻启用。")
+            }
+        } else {
+            fixedHosts.forEach { host ->
+                item(key = "host_${host.packageName}") { HostApplicationCard(host) }
+            }
+        }
+
+        item(key = "manage_telegram_title") { SmallTitle(text = "Telegram 客户端") }
+        if (telegramClients.isEmpty()) {
+            item(key = "manage_telegram_empty") {
+                BasicComponent(
+                    title = "未检测到 Telegram 客户端",
+                    summary = "会扫描已安装应用中的 Telegram-Android 标志类；识别后显示客户端自己的名称和图标。",
+                )
+            }
+        } else {
+            telegramClients.forEach { client ->
+                item(key = "telegram_${client.packageName}") { HostApplicationCard(client) }
             }
         }
     }
 }
 
 @Composable
-private fun HostApplicationCard(context: Context, target: AppTarget) {
-    val hostInfo = remember(target.packageName) {
-        context.packageManager.hostApplicationInfo(target.packageName)
-    }
-    var enabled by rememberSaveable(target.packageName) {
-        mutableStateOf(ConfigStore.enabledApplicationPackages(context).contains(target.packageName))
-    }
-    val installed = hostInfo != null
-    val iconPainter = hostInfo?.let { rememberApplicationIcon(it) }
-
+private fun HostApplicationCard(host: ManagedHostApp) {
+    val iconPainter = rememberApplicationIcon(host.applicationInfo)
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         cornerRadius = 20.dp,
         colors = CardDefaults.defaultColors(
-            color = if (installed) {
-                MiuixTheme.colorScheme.surfaceContainer
-            } else {
-                MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f)
-            },
+            color = MiuixTheme.colorScheme.surfaceContainer,
             contentColor = MiuixTheme.colorScheme.onSurface,
         ),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 12.dp, top = 14.dp, bottom = 14.dp),
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            HostIcon(target, iconPainter, installed)
+            HostIcon(host, iconPainter)
             Spacer(Modifier.size(14.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = target.displayName, color = MiuixTheme.colorScheme.onSurface)
-                if (!installed) {
-                    Spacer(Modifier.size(4.dp))
-                    Text(
-                        text = "未安装，暂不可使用",
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    )
-                }
+                Text(text = host.displayName, color = MiuixTheme.colorScheme.onSurface)
+                Spacer(Modifier.size(4.dp))
+                Text(
+                    text = if (host.isTelegramClient) "Telegram 客户端 · 常驻启用" else "常驻启用",
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
             }
-            Switch(
-                checked = enabled,
-                onCheckedChange = { checked ->
-                    enabled = checked
-                    ConfigStore.setApplicationEnabled(context, target.packageName, checked)
-                },
-            )
         }
     }
 }
 
 @Composable
-private fun HostIcon(target: AppTarget, iconPainter: Painter?, installed: Boolean) {
+private fun HostIcon(host: ManagedHostApp, iconPainter: Painter?) {
     Box(
         modifier = Modifier
             .size(52.dp)
-            .clip(RoundedCornerShape(15.dp))
-            .background(
-                if (installed) Color.Transparent else MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-            ),
+            .clip(RoundedCornerShape(15.dp)),
         contentAlignment = Alignment.Center,
     ) {
         if (iconPainter != null) {
             Image(
                 painter = iconPainter,
-                contentDescription = "${target.displayName}图标",
+                contentDescription = "${host.displayName}图标",
                 modifier = Modifier.size(52.dp).clip(RoundedCornerShape(15.dp)),
-            )
-        } else {
-            Icon(
-                imageVector = MiuixIcons.Basic.Sidebar,
-                contentDescription = "未安装应用",
-                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                modifier = Modifier.size(26.dp),
             )
         }
     }
@@ -148,5 +195,6 @@ private fun rememberApplicationIcon(info: ApplicationInfo): Painter? {
     }
 }
 
-private fun android.content.pm.PackageManager.hostApplicationInfo(packageName: String): ApplicationInfo? =
+@Suppress("DEPRECATION")
+private fun PackageManager.hostApplicationInfo(packageName: String): ApplicationInfo? =
     runCatching { getApplicationInfo(packageName, 0) }.getOrNull()

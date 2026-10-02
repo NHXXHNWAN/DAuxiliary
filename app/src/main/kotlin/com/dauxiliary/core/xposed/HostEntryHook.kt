@@ -8,14 +8,14 @@ import com.dauxiliary.core.telegram.TelegramAutoSignHook
 object HostEntryHook {
     fun resetForHotReload() {
         QQSettingsEntryHook.resetForHotReload()
+        TelegramSettingsEntryHook.resetForHotReload()
         TelegramAutoSignHook.resetForHotReload()
     }
 
     fun install(xposed: XposedInterface, target: AppTarget, classLoader: ClassLoader) {
         when (target) {
             AppTarget.QQ -> QQSettingsEntryHook.install(xposed, classLoader)
-            // Telegram feature hooks are installed from FeatureRegistry only when enabled.
-            AppTarget.TELEGRAM -> Unit
+            AppTarget.TELEGRAM -> TelegramSettingsEntryHook.install(xposed, classLoader)
             else -> Unit
         }
     }
