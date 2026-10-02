@@ -132,8 +132,16 @@ internal object TelegramSettingsEntryHook {
             return
         }
         val item = runCatching {
-            factory.invoke(null, SETTINGS_ENTRY_ID, 0xff6b8df2.toInt(), 0xff486bd0.toInt(), 0,
-                TITLE, null, null)
+            factory.invoke(
+                null,
+                SETTINGS_ENTRY_ID,
+                android.R.drawable.ic_menu_manage,
+                0xff486bd0.toInt(),
+                0,
+                TITLE,
+                "模块功能与设置",
+                null,
+            )
         }.getOrElse {
             synchronized(injectedLists) { injectedLists.remove(mutable) }
             android.util.Log.w(TAG, "Unable to create Telegram SettingCell", it)

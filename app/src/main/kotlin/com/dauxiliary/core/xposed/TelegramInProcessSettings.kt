@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.os.Build
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.OnBackPressedDispatcherOwner
 import androidx.compose.ui.platform.ComposeView
@@ -31,14 +32,15 @@ internal object TelegramInProcessSettings {
         if (activity.isFinishing || activity.isDestroyed) return
         val root = activity.window?.decorView as? ViewGroup ?: return
         if (root.findViewWithTag<View>(VIEW_TAG) != null) return
+        val content = activity.findViewById<ViewGroup>(android.R.id.content) ?: return
 
         // Compose saveable state also requires a SavedStateRegistryOwner. NagramXF's
         // Activity is not an AndroidX owner, so provide an isolated owner on this
         // injected subtree instead of mutating only the ComposeView.
         val lifecycleOwner = ComposeHostOwner()
         lifecycleOwner.performAttach()
-        root.setViewTreeLifecycleOwner(lifecycleOwner)
-        root.setViewTreeSavedStateRegistryOwner(lifecycleOwner)
+        content.setViewTreeLifecycleOwner(lifecycleOwner)
+        content.setViewTreeSavedStateRegistryOwner(lifecycleOwner)
         val composeView = ComposeView(activity).apply {
             tag = VIEW_TAG
             setViewTreeLifecycleOwner(lifecycleOwner)
@@ -47,10 +49,15 @@ internal object TelegramInProcessSettings {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             setContent { AppTheme { InjectedModuleSettings(AppTarget.TELEGRAM) } }
         }
-        root.addView(composeView, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        val overlay = FrameLayout(activity).apply {
+            tag = VIEW_TAG
+            setBackgroundColor(Color.WHITE)
+            addView(composeView, FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+        }
+        content.addView(overlay, FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
 
         fun close() {
-            if (composeView.parent === root) root.removeView(composeView)
+            if (overlay.parent === content) content.removeView(overlay)
             lifecycleOwner.performDetach()
         }
         if (activity is OnBackPressedDispatcherOwner) {
@@ -84,6 +91,8 @@ internal object TelegramInProcessSettings {
         private val savedStateController = SavedStateRegistryController.create(this)
 
         init {
+            // The registry must be attached before Compose starts reading saveable state.
+            savedStateController.performAttach()
             lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
             lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
             lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
