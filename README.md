@@ -12,6 +12,8 @@ DAuxiliary 是一个基于 LibXposed API 102 的 Android 宿主增强模块，�
 
 ## 支持范围
 
+Telegram 当前采用“包名优先、标志类兜底”的识别策略。识别成功不等于所有功能均可用：未知 fork 仅安全启用观察和诊断能力，自动发送链路尚未实现。Telegram X 及非 Telegram-Android 内核客户端不在支持范围内。
+
 | 宿主 | 包名 | 状态 |
 | --- | --- | --- |
 | 抖音 | `com.ss.android.ugc.aweme` | 宿主入口框架 |

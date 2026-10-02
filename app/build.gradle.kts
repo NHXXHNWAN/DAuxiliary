@@ -97,6 +97,8 @@ if (System.getProperty("os.arch") in setOf("aarch64", "arm64")) {
 
 
 dependencies {
+    testImplementation(kotlin("test"))
+    testImplementation("junit:junit:4.13.2")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

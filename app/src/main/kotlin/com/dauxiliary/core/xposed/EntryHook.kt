@@ -53,9 +53,22 @@ class EntryHook : XposedModule() {
         // Every recognized host is active; host-level enable switches are intentionally removed.
         log("Package ready: ${target.displayName} (${param.packageName}), enabled=true")
 
+        recordHostHeartbeat(target)
         FeatureRegistry.dispatch(this, param, target)
 
         log("Feature dispatch completed for ${target.displayName}")
+    }
+
+    /** Reports a real package-ready event to the module process for truthful UI status. */
+    private fun recordHostHeartbeat(target: AppTarget) {
+        runCatching {
+            val application = Class.forName("android.app.ActivityThread")
+                .getMethod("currentApplication")
+                .invoke(null) as? android.content.Context
+            application?.let { ConfigStore.recordHostLoaded(it, target) }
+        }.onFailure { error ->
+            log(Log.DEBUG, "Unable to record ${target.displayName} heartbeat", error)
+        }
     }
 
     override fun onHotReloading(param: XposedModuleInterface.HotReloadingParam): Boolean {

@@ -19,7 +19,7 @@ internal fun TelegramAutoSignPage() {
             InjectedGroupCard {
                 BasicComponent(
                     title = "自动签到接入",
-                    summary = "常驻启用；当前接入仍处于观察阶段，尚不执行自动发送。",
+                    summary = "观察模式已启用：学习按钮、记录目标和识别回复；不会自动发送消息或回调。", 
                 )
             }
         }

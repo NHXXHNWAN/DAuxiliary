@@ -19,7 +19,7 @@ object TelegramAutoSignHook {
     fun install(xposed: XposedInterface, classLoader: ClassLoader, packageName: String) {
         // EntryHook validates known packages and marker-class-detected Telegram forks.
         synchronized(installedLoaders) { if (!installedLoaders.add(classLoader)) return }
-        val state = runCatching { TelegramRuntimeState.current(classLoader) }.getOrElse {
+        val state = runCatching { TelegramRuntimeState.current(classLoader, packageName) }.getOrElse {
             synchronized(installedLoaders) { installedLoaders.remove(classLoader) }
             Log.w(TAG, "runtime state unavailable; hooks deferred", it)
             return
@@ -103,11 +103,13 @@ object TelegramAutoSignHook {
     private fun log(message: String) = Log.i(TAG, message)
 }
 
-private class TelegramRuntimeState private constructor(private val context: Context) {
+private class TelegramRuntimeState private constructor(
+    private val context: Context,
+    private val loader: ClassLoader,
+    packageName: String,
+) {
     private val prefs = TelegramPrefs(context)
-    // Until UserConfig exposes a verified account id on each fork, use a process-scoped
-    // placeholder. This prevents accidental cross-account claims but is not true account isolation yet.
-    private val accountId = "process_${context.packageName}"
+    private val accountId = AccountIdentityResolver.resolve(loader, packageName)
 
     fun learnButton(args: Array<Any?>) {
         val button = args.firstOrNull { it?.javaClass?.name?.contains("KeyboardButton") == true } ?: return
@@ -139,9 +141,9 @@ private class TelegramRuntimeState private constructor(private val context: Cont
 
     companion object {
         private val states = Collections.synchronizedMap(WeakHashMap<ClassLoader, TelegramRuntimeState>())
-        fun current(loader: ClassLoader): TelegramRuntimeState = states.getOrPut(loader) {
+        fun current(loader: ClassLoader, packageName: String): TelegramRuntimeState = states.getOrPut(loader) {
             val app = Class.forName("android.app.ActivityThread").getMethod("currentApplication").invoke(null) as Context
-            TelegramRuntimeState(app)
+            TelegramRuntimeState(app, loader, packageName)
         }
     }
 }

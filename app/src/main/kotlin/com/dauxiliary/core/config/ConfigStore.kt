@@ -21,7 +21,13 @@ object ConfigStore {
     private const val HOST_ACTIVE_WINDOW_MS = 5 * 60 * 1000L
     private const val MODULE_PACKAGE = "com.dauxiliary"
     private val DEFAULT_ENABLED_APPLICATIONS = AppTarget.entries.mapTo(linkedSetOf()) { it.packageName }
-    private val DEFAULT_ENABLED_FEATURES = setOf("home.module_settings")
+    private val DEFAULT_ENABLED_FEATURES = setOf(
+        "home.module_settings",
+        "telegram.host_support",
+        "telegram.auto_sign",
+        "qq.anti_recall",
+        "qq.disable_poke_effect",
+    )
 
     @Volatile
     private var remotePreferences: android.content.SharedPreferences? = null

@@ -1,5 +1,7 @@
 package com.dauxiliary.core.feature
 
+import android.util.Log
+import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.core.registry.AppTarget
 import com.dauxiliary.core.xposed.HostActivityTracker
 import com.dauxiliary.core.xposed.HostEntryHook
@@ -32,10 +34,10 @@ object FeatureRegistry {
         FeatureDefinition(
             id = TelegramAutoSignHook.FEATURE_ID,
             title = "Telegram 自动签到",
-            summary = "Telegram-Android 客户端的签到观察与接入能力。",
+            summary = "仅观察已学习的签到目标与回复；自动发送尚未启用，未知 fork 安全降级。",
             category = FeatureCategory.CHAT,
             hosts = setOf(AppTarget.TELEGRAM),
-            implemented = false,
+            implemented = true,
         ),
         FeatureDefinition(
             id = QQRecallHook.FEATURE_ID,
@@ -69,16 +71,30 @@ object FeatureRegistry {
         packageParam: XposedModuleInterface.PackageReadyParam,
         host: AppTarget,
     ) {
-        // All recognized hosts are active; there are no user-controlled feature gates.
-        HostEntryHook.install(xposed, host, packageParam.classLoader)
+        // Entry injection is independent from feature implementations and must not
+        // be blocked by one failed feature hook.
+        runHook("${host.name}.entry") { HostEntryHook.install(xposed, host, packageParam.classLoader) }
 
-        if (host == AppTarget.TELEGRAM) {
-            TelegramAutoSignHook.install(xposed, packageParam.classLoader, packageParam.packageName)
+        if (host == AppTarget.TELEGRAM && enabled(host, TelegramAutoSignHook.FEATURE_ID)) {
+            runHook(TelegramAutoSignHook.FEATURE_ID) {
+                TelegramAutoSignHook.install(xposed, packageParam.classLoader, packageParam.packageName)
+            }
         }
 
-        if (host == AppTarget.QQ) {
-            QQRecallHook.install(xposed, packageParam.classLoader)
-            QQPokeEffectHook.install(xposed, packageParam.classLoader)
+        if (host == AppTarget.QQ && enabled(host, QQRecallHook.FEATURE_ID)) {
+            runHook(QQRecallHook.FEATURE_ID) { QQRecallHook.install(xposed, packageParam.classLoader) }
+        }
+        if (host == AppTarget.QQ && enabled(host, QQPokeEffectHook.FEATURE_ID)) {
+            runHook(QQPokeEffectHook.FEATURE_ID) { QQPokeEffectHook.install(xposed, packageParam.classLoader) }
+        }
+    }
+
+    private fun enabled(host: AppTarget, featureId: String): Boolean =
+        ConfigStore.isFeatureEnabledInHookedProcess(host, featureId)
+
+    private inline fun runHook(id: String, block: () -> Unit) {
+        runCatching { block() }.onFailure { error ->
+            Log.e("DAuxiliary", "Feature hook failed: $id", error)
         }
     }
 
