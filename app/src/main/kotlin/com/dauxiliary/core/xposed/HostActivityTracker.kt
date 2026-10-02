@@ -42,6 +42,23 @@ internal object HostActivityTracker : Application.ActivityLifecycleCallbacks {
 
     fun currentActivity(): Activity? = current.get()
 
+    /** Last-resort lookup for Telegram forks whose click dispatcher is not an Activity. */
+    fun findLiveActivity(): Activity? {
+        current.get()?.let { if (!it.isFinishing && !it.isDestroyed) return it }
+        return runCatching {
+            val thread = Class.forName("android.app.ActivityThread")
+                .getMethod("currentActivityThread").invoke(null)
+            val field = thread.javaClass.getDeclaredField("mActivities").apply { isAccessible = true }
+            val records = field.get(thread) as? Map<*, *>
+            records?.values?.asSequence()?.mapNotNull { record ->
+                record?.javaClass?.declaredFields?.firstOrNull { it.name == "activity" }?.let { f ->
+                    f.isAccessible = true
+                    f.get(record) as? Activity
+                }
+            }?.lastOrNull { !it.isFinishing && !it.isDestroyed }
+        }.getOrNull()
+    }
+
     fun remember(activity: Activity) {
         current = WeakReference(activity)
     }

@@ -34,14 +34,13 @@ internal object TelegramInProcessSettings {
         val root = activity.window?.decorView as? ViewGroup ?: return
         if (root.findViewWithTag<View>(VIEW_TAG) != null) return
         val content = activity.findViewById<ViewGroup>(android.R.id.content) ?: return
+        android.util.Log.i("DAuxiliary-TelegramEntry", "Opening injected settings in ${activity.javaClass.name}")
 
         // Compose saveable state also requires a SavedStateRegistryOwner. NagramXF's
         // Activity is not an AndroidX owner, so provide an isolated owner on this
         // injected subtree instead of mutating only the ComposeView.
         val lifecycleOwner = ComposeHostOwner()
         lifecycleOwner.performAttach()
-        content.setViewTreeLifecycleOwner(lifecycleOwner)
-        content.setViewTreeSavedStateRegistryOwner(lifecycleOwner)
         val composeView = ComposeView(activity).apply {
             tag = VIEW_TAG
             setViewTreeLifecycleOwner(lifecycleOwner)

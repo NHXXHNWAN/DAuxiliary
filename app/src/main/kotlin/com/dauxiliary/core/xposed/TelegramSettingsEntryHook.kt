@@ -46,6 +46,9 @@ internal object TelegramSettingsEntryHook {
     private val clickedSettingsActivities = Collections.newSetFromMap(
         WeakHashMap<Activity, Boolean>(),
     )
+    private val rememberedSettingsActivities = Collections.newSetFromMap(
+        WeakHashMap<Activity, Boolean>(),
+    )
 
     private sealed interface MemberReader {
         data class MethodReader(val method: Method) : MemberReader
@@ -97,6 +100,7 @@ internal object TelegramSettingsEntryHook {
         itemIdReaders[loader] = idReader
 
         val methods = activity.declaredMethods
+        installActivityTrackerHooks(xposed, activity)
         val fillItems = methods.firstOrNull { method ->
             method.name == "fillItems" && method.parameterTypes.size == 2 &&
                 java.util.ArrayList::class.java.isAssignableFrom(method.parameterTypes[0])
@@ -129,6 +133,23 @@ internal object TelegramSettingsEntryHook {
             count++
         }
         return count
+    }
+
+    private fun installActivityTrackerHooks(xposed: XposedInterface, activity: Class<*>) {
+        activity.declaredMethods.filter { method ->
+            method.name in setOf("onCreate", "onStart", "onResume") &&
+                method.parameterTypes.size <= 1
+        }.forEach { method ->
+            if (!markMethod(method)) return@forEach
+            hook(xposed, method, "telegram.settings.activity.${method.name}") { chain ->
+                val result = chain.proceed()
+                (chain.getThisObject() as? Activity)?.let {
+                    HostActivityTracker.remember(it)
+                    synchronized(rememberedSettingsActivities) { rememberedSettingsActivities.add(it) }
+                }
+                result
+            }
+        }
     }
 
     private fun resolveClickActivity(chain: XposedInterface.Chain): Activity? {
@@ -175,6 +196,10 @@ internal object TelegramSettingsEntryHook {
         return findActivity(thisObject)
             ?: findActivity(chain.getArg(0))
             ?: HostActivityTracker.currentActivity()
+            ?: HostActivityTracker.findLiveActivity()
+            ?: synchronized(rememberedSettingsActivities) {
+                rememberedSettingsActivities.lastOrNull { !it.isFinishing && !it.isDestroyed }
+            }
     }
 
     private fun injectSettingsItem(items: MutableList<*>, factory: Method, idReader: MemberReader) {
