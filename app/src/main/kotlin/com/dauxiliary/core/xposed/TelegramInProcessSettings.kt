@@ -28,6 +28,7 @@ internal object TelegramInProcessSettings {
     private const val VIEW_TAG = "dauxiliary.telegram.settings.view"
 
     fun open(context: Context, classLoader: ClassLoader) {
+        HostActivityTracker.register(context)
         val activity = findActivity(context) ?: HostActivityTracker.currentActivity() ?: return
         if (activity.isFinishing || activity.isDestroyed) return
         val root = activity.window?.decorView as? ViewGroup ?: return

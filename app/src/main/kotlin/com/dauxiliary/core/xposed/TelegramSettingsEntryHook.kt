@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -18,6 +19,7 @@ import io.github.libxposed.api.XposedInterface
 import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.util.Collections
+import java.util.IdentityHashMap
 import java.util.WeakHashMap
 
 /** Injects DAuxiliary into Telegram's native settings list, following TMoe's dual-version strategy. */
@@ -41,6 +43,9 @@ internal object TelegramSettingsEntryHook {
     private val injectedLists = Collections.newSetFromMap(WeakHashMap<Any, Boolean>())
     private val itemFactories = Collections.synchronizedMap(WeakHashMap<ClassLoader, Method>())
     private val itemIdReaders = Collections.synchronizedMap(WeakHashMap<ClassLoader, MemberReader>())
+    private val clickedSettingsActivities = Collections.newSetFromMap(
+        WeakHashMap<Activity, Boolean>(),
+    )
 
     private sealed interface MemberReader {
         data class MethodReader(val method: Method) : MemberReader
@@ -110,11 +115,13 @@ internal object TelegramSettingsEntryHook {
         if (markMethod(onClick)) {
             hook(xposed, onClick, "telegram.settings.onClick") { chain ->
                 if (readItemId(chain.getArg(0), idReader) == SETTINGS_ENTRY_ID) {
-                    val activityInstance = chain.getThisObject() as? Activity
-                        ?: HostActivityTracker.currentActivity()
+                    val activityInstance = resolveClickActivity(chain)
                     android.util.Log.i(TAG, "DAuxiliary settings row clicked; activity=${activityInstance?.javaClass?.name}")
                     if (activityInstance != null) {
+                        HostActivityTracker.remember(activityInstance)
                         TelegramInProcessSettings.open(activityInstance, loader)
+                    } else {
+                        android.util.Log.w(TAG, "Unable to resolve Telegram Activity from settings click")
                     }
                     null
                 } else chain.proceed()
@@ -122,6 +129,52 @@ internal object TelegramSettingsEntryHook {
             count++
         }
         return count
+    }
+
+    private fun resolveClickActivity(chain: XposedInterface.Chain): Activity? {
+        val thisObject = chain.getThisObject()
+        fun fromContext(context: Context?): Activity? {
+            var current: Context? = context
+            while (current is android.content.ContextWrapper) {
+                if (current is Activity) return current
+                current = current.baseContext
+            }
+            return current as? Activity
+        }
+        fun findActivity(value: Any?, depth: Int = 0): Activity? {
+            if (value == null || depth > 2) return null
+            if (value is Activity) return value
+            if (value is Context) {
+                fromContext(value)?.let { return it }
+                HostActivityTracker.register(value)
+            }
+            listOf("getActivity", "getContext", "getParentActivity").forEach { name ->
+                runCatching {
+                    val method = value.javaClass.methods.firstOrNull {
+                        it.name == name && it.parameterTypes.isEmpty()
+                    }
+                    method?.let { findActivity(it.invoke(value), depth + 1) }?.let { return it }
+                }
+            }
+            var type: Class<*>? = value.javaClass
+            while (type != null) {
+                type.declaredFields.forEach { field ->
+                    if (Activity::class.java.isAssignableFrom(field.type) ||
+                        Context::class.java.isAssignableFrom(field.type)
+                    ) {
+                        runCatching {
+                            field.isAccessible = true
+                            findActivity(field.get(value), depth + 1)?.let { return it }
+                        }
+                    }
+                }
+                type = type.superclass
+            }
+            return null
+        }
+        return findActivity(thisObject)
+            ?: findActivity(chain.getArg(0))
+            ?: HostActivityTracker.currentActivity()
     }
 
     private fun injectSettingsItem(items: MutableList<*>, factory: Method, idReader: MemberReader) {
@@ -143,7 +196,7 @@ internal object TelegramSettingsEntryHook {
             factory.invoke(
                 null,
                 SETTINGS_ENTRY_ID,
-                com.dauxiliary.R.drawable.ic_launcher,
+                0,
                 0xff486bd0.toInt(),
                 0,
                 TITLE,

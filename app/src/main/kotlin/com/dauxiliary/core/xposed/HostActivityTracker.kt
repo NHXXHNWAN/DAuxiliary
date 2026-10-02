@@ -42,6 +42,10 @@ internal object HostActivityTracker : Application.ActivityLifecycleCallbacks {
 
     fun currentActivity(): Activity? = current.get()
 
+    fun remember(activity: Activity) {
+        current = WeakReference(activity)
+    }
+
     override fun onActivityResumed(activity: Activity) {
         current = WeakReference(activity)
     }
@@ -54,7 +58,9 @@ internal object HostActivityTracker : Application.ActivityLifecycleCallbacks {
         if (current.get() === activity) current.clear()
     }
 
-    override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
+    override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
+        current = WeakReference(activity)
+    }
     override fun onActivityPaused(activity: Activity) = Unit
     override fun onActivityStopped(activity: Activity) = Unit
     override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
