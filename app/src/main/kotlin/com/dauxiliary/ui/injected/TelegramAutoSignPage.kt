@@ -67,6 +67,7 @@ internal fun TelegramAutoSignPage() {
                         scope.launch {
                             authorized = TelegramAuthorization.verify(context)
                             prefs.setAuthorized(authorized)
+                            com.dauxiliary.core.config.ConfigStore.setTelegramAuthorized(context, authorized)
                             checking = false
                         }
                     },

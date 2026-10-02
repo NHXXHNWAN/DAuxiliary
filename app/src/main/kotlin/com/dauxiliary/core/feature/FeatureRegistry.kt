@@ -96,7 +96,8 @@ object FeatureRegistry {
         val context = Class.forName("android.app.ActivityThread")
             .getMethod("currentApplication").invoke(null) as? android.content.Context
             ?: return false
-        com.dauxiliary.core.telegram.TelegramPrefs(context).authorized()
+        ConfigStore.isTelegramAuthorized(context) ||
+            com.dauxiliary.core.telegram.TelegramPrefs(context).authorized()
     }.getOrDefault(false)
 
     private inline fun runHook(id: String, block: () -> Unit) {

@@ -50,6 +50,12 @@ object ConfigStore {
         }
     }
 
+    fun isTelegramAuthorized(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_TELEGRAM_AUTHORIZED, false)
+
+    fun setTelegramAuthorized(context: Context, authorized: Boolean) =
+        prefs(context).edit().putBoolean(KEY_TELEGRAM_AUTHORIZED, authorized).apply()
+
     fun enabledApplicationPackages(context: Context): Set<String> {
         val preferences = prefs(context)
         if (context.packageName == MODULE_PACKAGE &&
