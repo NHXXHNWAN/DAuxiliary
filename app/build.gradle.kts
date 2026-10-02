@@ -12,7 +12,9 @@ android {
 
     defaultConfig {
         applicationId = "com.dauxiliary"
-        // Keep the LibXposed entry reachable for XP102-compatible loaders.
+        // XP102/FPA resolves java_init.list through the primary dex on some hosts.
+        multiDexEnabled = true
+        multiDexKeepFile = file("main-dex-list.txt")
         multiDexKeepProguard = file("multidex-keep.pro")
         // miuix-blur-android 0.9.4-rc01 declares minSdk 33.
         minSdk = 33
