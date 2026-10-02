@@ -9,9 +9,18 @@ import java.util.Locale
 class TelegramPrefs(context: Context) {
     private val prefs = context.createDeviceProtectedStorageContext()
         .getSharedPreferences("telegram_autosign", Context.MODE_PRIVATE)
-
     fun enabled(): Boolean = prefs.getBoolean("enabled", true)
     fun setEnabled(value: Boolean) = prefs.edit().putBoolean("enabled", value).apply()
+
+    /** Telegram-only authorization state. Other hosts deliberately do not use this gate. */
+    fun authorized(): Boolean = prefs.getBoolean("authorized", false)
+    fun setAuthorized(value: Boolean) = prefs.edit().putBoolean("authorized", value).apply()
+    fun authEndpoint(): String = prefs.getString("auth_endpoint", "")?.trim().orEmpty()
+    fun setAuthEndpoint(value: String) = prefs.edit().putString("auth_endpoint", value.trim()).apply()
+
+    fun telegramUserId(): String = prefs.getString("telegram_user_id", "")?.trim().orEmpty()
+    fun setTelegramUserId(value: String) = prefs.edit().putString("telegram_user_id", value.trim()).apply()
+
 
     /** Account prefix is deliberately explicit so multiple Telegram accounts cannot share state. */
     private fun key(account: String, name: String, id: String) =

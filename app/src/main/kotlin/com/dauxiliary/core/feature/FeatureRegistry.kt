@@ -75,7 +75,7 @@ object FeatureRegistry {
         // be blocked by one failed feature hook.
         runHook("${host.name}.entry") { HostEntryHook.install(xposed, host, packageParam.classLoader) }
 
-        if (host == AppTarget.TELEGRAM && enabled(host, TelegramAutoSignHook.FEATURE_ID)) {
+        if (host == AppTarget.TELEGRAM && telegramAuthorized() && enabled(host, TelegramAutoSignHook.FEATURE_ID)) {
             runHook(TelegramAutoSignHook.FEATURE_ID) {
                 TelegramAutoSignHook.install(xposed, packageParam.classLoader, packageParam.packageName)
             }
@@ -91,6 +91,13 @@ object FeatureRegistry {
 
     private fun enabled(host: AppTarget, featureId: String): Boolean =
         ConfigStore.isFeatureEnabledInHookedProcess(host, featureId)
+
+    private fun telegramAuthorized(): Boolean = runCatching {
+        val context = Class.forName("android.app.ActivityThread")
+            .getMethod("currentApplication").invoke(null) as? android.content.Context
+            ?: return false
+        com.dauxiliary.core.telegram.TelegramPrefs(context).authorized()
+    }.getOrDefault(false)
 
     private inline fun runHook(id: String, block: () -> Unit) {
         runCatching { block() }.onFailure { error ->

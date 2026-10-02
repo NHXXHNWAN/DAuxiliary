@@ -15,6 +15,7 @@ object ConfigStore {
     const val KEY_DYNAMIC_BACKGROUND = "dynamic_background"
     const val KEY_FULLSCREEN_BACKGROUND = "fullscreen_background"
     const val KEY_UPDATE_CHANNEL = "update_channel"
+    const val KEY_TELEGRAM_AUTHORIZED = "telegram_authorized"
     const val KEY_APPLICATION_SELECTION_INITIALIZED = "application_selection_initialized"
     private const val KEY_HOST_FEATURE_PREFIX = "enabled_features_"
     private const val KEY_HOST_LAST_SEEN_PREFIX = "host_last_seen_"
