@@ -60,15 +60,18 @@ internal object TelegramSettingsEntryHook {
         var count = 0
         modernSettingsClasses.forEach { name ->
             val type = runCatching { classLoader.loadClass(name) }.getOrNull() ?: return@forEach
-            // The native SettingCell path cannot safely resolve DAuxiliary resources inside
-            // Telegram/NagramXF and is intentionally disabled. Always install the
-            // self-contained View fallback, including on builds that expose the
-            // native fillItems/onClick methods.
-            count += installViewFallbackPath(xposed, classLoader, type, "telegram.settings")
+            // Use the host's native SettingCell so the row is placed together with
+            // NagramXF's own settings items. Do not add a second overlay/fallback row.
+            count += installModernSettingsPath(xposed, classLoader, type)
         }
-        legacyProfileClasses.forEach { name ->
-            val type = runCatching { classLoader.loadClass(name) }.getOrNull() ?: return@forEach
-            count += installLegacyProfilePath(xposed, classLoader, type)
+        // Do not install the legacy ProfileActivity fallback when the modern
+        // SettingsActivity path is active; both can be present in NagramXF and
+        // would create a second row/overlay at a conflicting position.
+        if (count == 0) {
+            legacyProfileClasses.forEach { name ->
+                val type = runCatching { classLoader.loadClass(name) }.getOrNull() ?: return@forEach
+                count += installLegacyProfilePath(xposed, classLoader, type)
+            }
         }
         if (count == 0) synchronized(installedLoaders) { installedLoaders.remove(classLoader) }
         android.util.Log.i(TAG, "entry hooks registered=$count")
@@ -200,12 +203,6 @@ internal object TelegramSettingsEntryHook {
     }
 
     private fun injectSettingsItem(items: MutableList<*>, factory: Method, idReader: MemberReader) {
-        // NagramXF resolves drawable IDs with its own Resources. A module resource ID
-        // is therefore invalid here and results in an empty icon. Use the view fallback,
-        // where the module Drawable can be attached directly instead.
-        return
-        @Suppress("UNUSED_VARIABLE")
-        val ignored = items
         @Suppress("UNCHECKED_CAST")
         val mutable = items as? MutableList<Any?> ?: return
         synchronized(injectedLists) { if (!injectedLists.add(mutable)) return }

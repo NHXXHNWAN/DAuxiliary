@@ -45,21 +45,27 @@ internal object TelegramInProcessSettings {
         // Activity is not an AndroidX owner, so provide an isolated owner on this
         // injected subtree instead of mutating only the ComposeView.
         val lifecycleOwner = ComposeHostOwner()
-        lifecycleOwner.performAttach()
+        // Compose must see an attached, CREATED owner. Do not advance the
+        // isolated owner to RESUMED before setContent; NagramXF's obfuscated
+        // saveable-state code can consume restored state during composition.
         val composeView = ComposeView(activity).apply {
             tag = VIEW_TAG
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
             setBackgroundColor(Color.TRANSPARENT)
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
-            setContent { AppTheme { InjectedModuleSettings(AppTarget.TELEGRAM) } }
         }
         val overlay = FrameLayout(activity).apply {
             tag = VIEW_TAG
             setBackgroundColor(Color.WHITE)
             addView(composeView, FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
         }
+        // Attach the owner and the ComposeView to the real window before starting
+        // composition. Starting composition while the view is detached can make
+        // Compose consume saved state before the registry is in CREATED state.
         content.addView(overlay, FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+        lifecycleOwner.performStart()
+        composeView.setContent { AppTheme { InjectedModuleSettings(AppTarget.TELEGRAM) } }
 
         fun close() {
             if (overlay.parent === content) content.removeView(overlay)
@@ -99,8 +105,8 @@ internal object TelegramInProcessSettings {
             // The registry must be attached before Compose starts reading saveable state.
             savedStateController.performAttach()
             lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
-            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
-            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+            // Keep the owner at CREATED while Compose registers saveable state.
+            // It is advanced after the view has been attached.
         }
 
         override val lifecycle: Lifecycle get() = lifecycleRegistry
@@ -108,7 +114,15 @@ internal object TelegramInProcessSettings {
             get() = savedStateController.savedStateRegistry
 
         fun performAttach() {
+            // Kept for binary/source compatibility with older callers.
             runCatching { savedStateController.performAttach() }
+        }
+
+        fun performStart() {
+            if (lifecycle.currentState == Lifecycle.State.CREATED) {
+                lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
+                lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+            }
         }
 
         fun performDetach() {

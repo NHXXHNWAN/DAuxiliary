@@ -46,7 +46,7 @@ export default {
         await sendText(env, chatId, `找到版本 ${release.tag_name || "(无标签)"}，但该 Release 没有 APK 附件。`);
         return new Response("OK");
       }
-      const caption = `${release.name || release.tag_name || "DAuxiliary"}\n${release.body || "无更新说明"}`.slice(0, 1024);
+      const caption = formatReleaseCaption(release);
       await sendDocument(env, chatId, apk.browser_download_url, apk.name, caption);
     } catch (error) {
       console.error("Release lookup/send failed:", error);
@@ -114,6 +114,14 @@ async function telegram(env, method, payload) {
   }
   return result;
 }
+function formatReleaseCaption(release) {
+  const channel = release.prerelease ? "测试版" : "正式版";
+  const version = release.name || release.tag_name || "未知版本";
+  const notes = String(release.body || "暂无更新说明").trim();
+  const url = release.html_url || "";
+  return `DAuxiliary ${channel}\n版本：${version}\n\n更新内容\n${notes}\n\nGitHub Release 下载页面：${url}`.slice(0, 1024);
+}
+
 function safeError(error) {
   return String(error?.message || "未知错误").slice(0, 250);
 }
