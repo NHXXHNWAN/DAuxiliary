@@ -52,9 +52,14 @@ internal object TelegramSettingsEntryHook {
         var count = 0
         modernSettingsClasses.forEach { name ->
             val type = runCatching { classLoader.loadClass(name) }.getOrNull() ?: return@forEach
-            count += installModernSettingsPath(xposed, classLoader, type)
-            // Keep a UI fallback even when a Telegram fork changes the native item model/signatures.
-            count += installViewFallbackPath(xposed, classLoader, type, "telegram.settings")
+            // Do not install the fallback together with the native path. NagramXF and
+            // newer Telegram builds can expose both paths, which creates two rows and
+            // makes the fallback appear at the wrong position.
+            val modernCount = installModernSettingsPath(xposed, classLoader, type)
+            count += modernCount
+            if (modernCount == 0) {
+                count += installViewFallbackPath(xposed, classLoader, type, "telegram.settings")
+            }
         }
         legacyProfileClasses.forEach { name ->
             val type = runCatching { classLoader.loadClass(name) }.getOrNull() ?: return@forEach
