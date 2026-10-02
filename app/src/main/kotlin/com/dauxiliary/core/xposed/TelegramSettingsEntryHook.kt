@@ -53,6 +53,8 @@ internal object TelegramSettingsEntryHook {
         modernSettingsClasses.forEach { name ->
             val type = runCatching { classLoader.loadClass(name) }.getOrNull() ?: return@forEach
             count += installModernSettingsPath(xposed, classLoader, type)
+            // Keep a UI fallback even when a Telegram fork changes the native item model/signatures.
+            count += installViewFallbackPath(xposed, classLoader, type, "telegram.settings")
         }
         legacyProfileClasses.forEach { name ->
             val type = runCatching { classLoader.loadClass(name) }.getOrNull() ?: return@forEach
@@ -140,6 +142,34 @@ internal object TelegramSettingsEntryHook {
             }
     }
 
+    private fun installViewFallbackPath(
+        xposed: XposedInterface,
+        loader: ClassLoader,
+        activityClass: Class<*>,
+        hookPrefix: String,
+    ): Int {
+        var count = 0
+        activityClass.declaredMethods.filter(::isViewCreationMethod).forEach { method ->
+            if (!markMethod(method)) return@forEach
+            hook(xposed, method, "$hookPrefix.view.${method.name}") { chain ->
+                val result = chain.proceed()
+                scheduleInject(chain.getThisObject(), result as? View, loader)
+                result
+            }
+            count++
+        }
+        activityClass.declaredMethods.filter(::isResumeMethod).forEach { method ->
+            if (!markMethod(method)) return@forEach
+            hook(xposed, method, "$hookPrefix.resume") { chain ->
+                val result = chain.proceed()
+                scheduleInject(chain.getThisObject(), null, loader)
+                result
+            }
+            count++
+        }
+        return count
+    }
+
     /** Older clients use ProfileActivity rows; keep a conservative in-page fallback there. */
     private fun installLegacyProfilePath(xposed: XposedInterface, loader: ClassLoader, profile: Class<*>): Int {
         val adapter = runCatching { loader.loadClass(PROFILE_ADAPTER_CLASS) }.getOrNull() ?: profile
@@ -210,7 +240,9 @@ internal object TelegramSettingsEntryHook {
     private fun isViewCreationMethod(method: Method): Boolean =
         View::class.java.isAssignableFrom(method.returnType) &&
             method.name in setOf("createView", "onCreateView", "doOnCreateView") &&
-            (method.parameterTypes.isEmpty() || method.parameterTypes.contentEquals(arrayOf(Bundle::class.java)))
+            method.parameterTypes.size <= 2 && method.parameterTypes.all {
+                Context::class.java.isAssignableFrom(it) || Bundle::class.java.isAssignableFrom(it)
+            }
 
     private fun isResumeMethod(method: Method): Boolean =
         method.name == "onResume" && method.parameterTypes.isEmpty() && method.returnType == Void.TYPE
