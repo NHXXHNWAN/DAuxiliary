@@ -29,7 +29,7 @@ internal object TelegramSettingsEntryHook {
     private const val ENTRY_TAG = "dauxiliary.telegram.settings.entry"
     private const val OVERLAY_TAG = "dauxiliary.telegram.settings.overlay"
     private const val RETRY_DELAY_MS = 220L
-    private const val RETRIES = 6
+    private const val RETRIES = 20
     private const val SETTINGS_ENTRY_ID = 0x7f0e4da1
     private const val SETTINGS_LANGUAGE_ITEM_ID = 10
     private const val SETTINGS_FACTORY_CLASS = "org.telegram.ui.SettingsActivity\$SettingCell\$Factory"
@@ -60,14 +60,11 @@ internal object TelegramSettingsEntryHook {
         var count = 0
         modernSettingsClasses.forEach { name ->
             val type = runCatching { classLoader.loadClass(name) }.getOrNull() ?: return@forEach
-            // Do not install the fallback together with the native path. NagramXF and
-            // newer Telegram builds can expose both paths, which creates two rows and
-            // makes the fallback appear at the wrong position.
-            val modernCount = installModernSettingsPath(xposed, classLoader, type)
-            count += modernCount
-            if (modernCount == 0) {
-                count += installViewFallbackPath(xposed, classLoader, type, "telegram.settings")
-            }
+            // The native SettingCell path cannot safely resolve DAuxiliary resources inside
+            // Telegram/NagramXF and is intentionally disabled. Always install the
+            // self-contained View fallback, including on builds that expose the
+            // native fillItems/onClick methods.
+            count += installViewFallbackPath(xposed, classLoader, type, "telegram.settings")
         }
         legacyProfileClasses.forEach { name ->
             val type = runCatching { classLoader.loadClass(name) }.getOrNull() ?: return@forEach
@@ -344,13 +341,15 @@ internal object TelegramSettingsEntryHook {
 
     private fun isViewCreationMethod(method: Method): Boolean =
         View::class.java.isAssignableFrom(method.returnType) &&
-            method.name in setOf("createView", "onCreateView", "doOnCreateView") &&
-            method.parameterTypes.size <= 2 && method.parameterTypes.all {
-                Context::class.java.isAssignableFrom(it) || Bundle::class.java.isAssignableFrom(it)
+            method.name in setOf("createView", "onCreateView", "doOnCreateView", "createContentView", "buildLayout") &&
+            method.parameterTypes.size <= 3 && method.parameterTypes.all {
+                Context::class.java.isAssignableFrom(it) || Bundle::class.java.isAssignableFrom(it) ||
+                    ViewGroup::class.java.isAssignableFrom(it)
             }
 
     private fun isResumeMethod(method: Method): Boolean =
-        method.name == "onResume" && method.parameterTypes.isEmpty() && method.returnType == Void.TYPE
+        method.name in setOf("onResume", "onStart", "onPostResume") &&
+            method.parameterTypes.isEmpty() && method.returnType == Void.TYPE
 
     private fun hook(xposed: XposedInterface, method: Method, id: String, callback: (XposedInterface.Chain) -> Any?) {
         runCatching {
