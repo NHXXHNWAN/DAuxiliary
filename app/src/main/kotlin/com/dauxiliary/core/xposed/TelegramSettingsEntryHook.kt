@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
-import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -15,6 +14,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.ImageView
 import io.github.libxposed.api.XposedInterface
 import java.lang.reflect.Field
 import java.lang.reflect.Method
@@ -203,6 +203,12 @@ internal object TelegramSettingsEntryHook {
     }
 
     private fun injectSettingsItem(items: MutableList<*>, factory: Method, idReader: MemberReader) {
+        // NagramXF resolves drawable IDs with its own Resources. A module resource ID
+        // is therefore invalid here and results in an empty icon. Use the view fallback,
+        // where the module Drawable can be attached directly instead.
+        return
+        @Suppress("UNUSED_VARIABLE")
+        val ignored = items
         @Suppress("UNCHECKED_CAST")
         val mutable = items as? MutableList<Any?> ?: return
         synchronized(injectedLists) { if (!injectedLists.add(mutable)) return }
@@ -381,14 +387,30 @@ internal object TelegramSettingsEntryHook {
     private fun injectViewFallback(root: View, activity: Activity, loader: ClassLoader): Boolean {
         val decor = activity.window?.decorView as? ViewGroup ?: return false
         if (decor.findViewWithTag<View>(ENTRY_TAG) != null || decor.findViewWithTag<View>(OVERLAY_TAG) != null) return true
-        val entry = TextView(activity).apply {
+        val entry = LinearLayout(activity).apply {
             tag = ENTRY_TAG
-            text = TITLE
+            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-            setTextColor(resolveColor(activity, android.R.attr.textColorPrimary, Color.DKGRAY))
             setPadding(dp(activity, 20), 0, dp(activity, 20), 0)
-            minHeight = dp(activity, 52)
+            addView(ImageView(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(activity, 32), dp(activity, 32)).apply {
+                    marginEnd = dp(activity, 16)
+                }
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                imageTintList = null
+                setImageDrawable(runCatching {
+                    activity.createPackageContext("com.dauxiliary", Context.CONTEXT_IGNORE_SECURITY)
+                        .packageManager.getApplicationIcon("com.dauxiliary")
+                }.getOrNull())
+            })
+            addView(TextView(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                text = TITLE
+                gravity = Gravity.CENTER_VERTICAL
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                setTextColor(resolveColor(activity, android.R.attr.textColorPrimary, Color.DKGRAY))
+            })
+            minimumHeight = dp(activity, 52)
             isClickable = true
             isFocusable = true
             contentDescription = TITLE

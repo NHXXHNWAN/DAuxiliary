@@ -7,6 +7,11 @@ import android.os.Build
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.graphics.drawable.Drawable
+import android.view.Gravity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.OnBackPressedDispatcherOwner
 import androidx.compose.ui.platform.ComposeView
@@ -29,7 +34,7 @@ internal object TelegramInProcessSettings {
 
     fun open(context: Context, classLoader: ClassLoader) {
         HostActivityTracker.register(context)
-        val activity = findActivity(context) ?: HostActivityTracker.currentActivity() ?: return
+        val activity = findActivity(context) ?: HostActivityTracker.currentActivity() ?: HostActivityTracker.findLiveActivity() ?: return
         if (activity.isFinishing || activity.isDestroyed) return
         val root = activity.window?.decorView as? ViewGroup ?: return
         if (root.findViewWithTag<View>(VIEW_TAG) != null) return
