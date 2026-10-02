@@ -111,7 +111,11 @@ internal object TelegramSettingsEntryHook {
             hook(xposed, onClick, "telegram.settings.onClick") { chain ->
                 if (readItemId(chain.getArg(0), idReader) == SETTINGS_ENTRY_ID) {
                     val activityInstance = chain.getThisObject() as? Activity
-                    if (activityInstance != null) TelegramInProcessSettings.open(activityInstance, loader)
+                        ?: HostActivityTracker.currentActivity()
+                    android.util.Log.i(TAG, "DAuxiliary settings row clicked; activity=${activityInstance?.javaClass?.name}")
+                    if (activityInstance != null) {
+                        TelegramInProcessSettings.open(activityInstance, loader)
+                    }
                     null
                 } else chain.proceed()
             }
@@ -124,7 +128,11 @@ internal object TelegramSettingsEntryHook {
         @Suppress("UNCHECKED_CAST")
         val mutable = items as? MutableList<Any?> ?: return
         synchronized(injectedLists) { if (!injectedLists.add(mutable)) return }
-        if (mutable.any { readItemId(it, idReader) == SETTINGS_ENTRY_ID }) return
+        // fillItems() is called repeatedly by NagramXF while rows are rebuilt. Do
+        // not append another copy when the fork returns a fresh list whose reader
+        // cannot expose the synthetic id reliably.
+        if (mutable.any { readItemId(it, idReader) == SETTINGS_ENTRY_ID ||
+                it?.toString()?.contains(TITLE, ignoreCase = true) == true }) return
         val index = mutable.indexOfFirst { readItemId(it, idReader) == SETTINGS_LANGUAGE_ITEM_ID }
         if (index < 0) {
             synchronized(injectedLists) { injectedLists.remove(mutable) }
@@ -135,11 +143,11 @@ internal object TelegramSettingsEntryHook {
             factory.invoke(
                 null,
                 SETTINGS_ENTRY_ID,
-                android.R.drawable.ic_menu_manage,
+                com.dauxiliary.R.drawable.ic_launcher,
                 0xff486bd0.toInt(),
                 0,
                 TITLE,
-                "模块功能与设置",
+                null,
                 null,
             )
         }.getOrElse {
