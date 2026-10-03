@@ -3,6 +3,9 @@
 name = "dauxiliary-worker"
 main = "worker.js"
 compatibility_date = "2026-10-02"
+# Keep variables and secrets configured in the Cloudflare dashboard when
+# Workers Builds deploys this Worker from the repository.
+keep_vars = true
 
 [[durable_objects.bindings]]
 name = "AUTH_DO"

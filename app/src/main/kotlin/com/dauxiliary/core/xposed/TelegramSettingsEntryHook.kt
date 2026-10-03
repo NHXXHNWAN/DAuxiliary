@@ -60,18 +60,15 @@ internal object TelegramSettingsEntryHook {
         var count = 0
         modernSettingsClasses.forEach { name ->
             val type = runCatching { classLoader.loadClass(name) }.getOrNull() ?: return@forEach
-            // Use the host's native SettingCell so the row is placed together with
-            // NagramXF's own settings items. Do not add a second overlay/fallback row.
-            count += installModernSettingsPath(xposed, classLoader, type)
+            // The native SettingCell path is too dependent on Telegram/NagramXF's
+            // obfuscated resource and click model. Use the self-contained fallback
+            // so the row remains clickable across client variants.
+            count += installViewFallbackPath(xposed, classLoader, type, "telegram.settings")
         }
-        // Do not install the legacy ProfileActivity fallback when the modern
-        // SettingsActivity path is active; both can be present in NagramXF and
-        // would create a second row/overlay at a conflicting position.
-        if (count == 0) {
-            legacyProfileClasses.forEach { name ->
-                val type = runCatching { classLoader.loadClass(name) }.getOrNull() ?: return@forEach
-                count += installLegacyProfilePath(xposed, classLoader, type)
-            }
+        // Keep the legacy ProfileActivity path available for older Telegram forks.
+        legacyProfileClasses.forEach { name ->
+            val type = runCatching { classLoader.loadClass(name) }.getOrNull() ?: return@forEach
+            count += installLegacyProfilePath(xposed, classLoader, type)
         }
         if (count == 0) synchronized(installedLoaders) { installedLoaders.remove(classLoader) }
         android.util.Log.i(TAG, "entry hooks registered=$count")
