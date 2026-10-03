@@ -20,7 +20,16 @@ class TelegramPrefs(context: Context) {
 
     fun telegramUserId(): String = prefs.getString("telegram_user_id", "")?.trim().orEmpty()
     fun setTelegramUserId(value: String) = prefs.edit().putString("telegram_user_id", value.trim()).apply()
-
+    fun authToken(): String = prefs.getString("auth_token", "")?.trim().orEmpty()
+    fun setAuthToken(value: String) = prefs.edit().putString("auth_token", value.trim()).apply()
+    fun authCode(): String = prefs.getString("auth_code", "")?.trim().orEmpty()
+    fun setAuthCode(value: String) = prefs.edit().putString("auth_code", value.trim()).apply()
+    fun clearAuthorization() = prefs.edit()
+        .putBoolean("authorized", false)
+        .remove("telegram_user_id")
+        .remove("auth_token")
+        .remove("auth_code")
+        .apply()
 
     /** Account prefix is deliberately explicit so multiple Telegram accounts cannot share state. */
     private fun key(account: String, name: String, id: String) =

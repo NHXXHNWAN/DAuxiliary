@@ -8,6 +8,7 @@ import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 @Composable
 fun SettingsPage(
     onAboutClick: () -> Unit,
+    onAuthorizationAdminClick: () -> Unit,
     colorMode: Int,
     onColorModeChange: (Int) -> Unit,
     floatingNavigationBarStyle: Int,
@@ -41,6 +42,16 @@ fun SettingsPage(
                     items = listOf("稳定版（Release）", "测试版（Test）", "不检查更新"),
                     selectedIndex = updateChannel.coerceIn(0, 2),
                     onSelectedIndexChange = onUpdateChannelChange,
+                )
+            }
+        }
+        item { SmallTitle(text = "Telegram 管理") }
+        item {
+            GroupCard {
+                ArrowPreference(
+                    title = "Telegram 授权管理",
+                    summary = "管理模块授权、Bot 管理员与维护者",
+                    onClick = onAuthorizationAdminClick,
                 )
             }
         }

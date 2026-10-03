@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "DAuxiliary"
 include(":app")
+include(":admin")

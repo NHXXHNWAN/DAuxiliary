@@ -1,0 +1,13 @@
+# Durable Object database used by worker.js for one-time module authorization codes.
+# Set `wrangler secret put ADMIN_API_TOKEN` before deploying the management API.
+name = "dauxiliary-worker"
+main = "worker.js"
+compatibility_date = "2026-10-02"
+
+[[durable_objects.bindings]]
+name = "AUTH_DO"
+class_name = "TelegramAuthStore"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TelegramAuthStore"]

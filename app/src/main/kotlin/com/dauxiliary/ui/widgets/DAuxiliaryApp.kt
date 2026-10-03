@@ -20,6 +20,7 @@ import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.core.update.UpdateInfo
 import com.dauxiliary.ui.miuix.component.liquid.IosLiquidGlassNavigationBar
 import com.dauxiliary.ui.page.AboutPage
+import com.dauxiliary.ui.page.AuthorizationAdminPage
 import com.dauxiliary.ui.page.HomePage
 import com.dauxiliary.ui.page.LocalNavigationPadding
 import com.dauxiliary.ui.page.ManagePage
@@ -52,10 +53,14 @@ fun DAuxiliaryApp(
                 colorMode = colorMode,
                 onColorModeChange = onColorModeChange,
                 onAboutClick = { backStack.add(AppRoute.About) },
+                onAuthorizationAdminClick = { backStack.add(AppRoute.AuthorizationAdmin) },
             )
         }
         entry<AppRoute.About>(swipeDismiss = NavSwipeDirection.LeftToRight) {
             AboutPage(onBack = { backStack.removeLastOrNull() })
+        }
+        entry<AppRoute.AuthorizationAdmin>(swipeDismiss = NavSwipeDirection.LeftToRight) {
+            AuthorizationAdminPage(onBack = { backStack.removeLastOrNull() })
         }
     }
 }
@@ -65,6 +70,7 @@ private fun MainNavigation(
     colorMode: Int,
     onColorModeChange: (Int) -> Unit,
     onAboutClick: () -> Unit,
+    onAuthorizationAdminClick: () -> Unit,
 ) {
     val context = LocalContext.current
     var navigationBarStyle by rememberSaveable {
@@ -153,6 +159,7 @@ private fun MainNavigation(
                         1 -> ManagePage()
                         2 -> SettingsPage(
                             onAboutClick = onAboutClick,
+                            onAuthorizationAdminClick = onAuthorizationAdminClick,
                             colorMode = colorMode,
                             onColorModeChange = onColorModeChange,
                             floatingNavigationBarStyle = navigationBarStyle,
