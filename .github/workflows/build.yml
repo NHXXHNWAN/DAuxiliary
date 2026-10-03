@@ -18,13 +18,13 @@ permissions:
 jobs:
   build:
     name: Build release APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
@@ -41,9 +41,32 @@ jobs:
           RELEASE_KEY_PASSWORD_SECRET: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
           if [ -n "$RELEASE_KEYSTORE_BASE64" ] && [ -n "$RELEASE_STORE_PASSWORD_SECRET" ] && [ -n "$RELEASE_KEY_ALIAS_SECRET" ] && [ -n "$RELEASE_KEY_PASSWORD_SECRET" ]; then
-            echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/dauxiliary-release.jks"
+            # Accept wrapped Base64, URL-safe Base64, and omitted padding from clipboard tools.
+            keystore_base64="$(printf '%s' "$RELEASE_KEYSTORE_BASE64" | tr -d '[:space:]' | tr '_-' '/+')"
+            if [[ ! "$keystore_base64" =~ ^[A-Za-z0-9+/]*={0,2}$ ]]; then
+              echo "::error::RELEASE_KEYSTORE_BASE64 contains characters outside the Base64 alphabet. Recreate it directly from the .jks file."
+              exit 1
+            fi
+            remainder=$((${#keystore_base64} % 4))
+            if [ "$remainder" -eq 1 ]; then
+              echo "::error::RELEASE_KEYSTORE_BASE64 has an invalid length. Replace the secret with the complete Base64 output."
+              exit 1
+            elif [ "$remainder" -eq 2 ]; then
+              keystore_base64="${keystore_base64}=="
+            elif [ "$remainder" -eq 3 ]; then
+              keystore_base64="${keystore_base64}="
+            fi
+            keystore_file="$RUNNER_TEMP/dauxiliary-release.jks"
+            if ! printf '%s' "$keystore_base64" | base64 --decode > "$keystore_file"; then
+              echo "::error::RELEASE_KEYSTORE_BASE64 could not be decoded. Replace it with the complete Base64 output from the .jks file."
+              exit 1
+            fi
+            if ! keytool -list -keystore "$keystore_file" -storepass "$RELEASE_STORE_PASSWORD_SECRET" >/dev/null 2>&1; then
+              echo "::error::The decoded keystore cannot be opened. Check the Base64 value and RELEASE_STORE_PASSWORD."
+              exit 1
+            fi
             {
-              echo "RELEASE_STORE_FILE=$RUNNER_TEMP/dauxiliary-release.jks"
+              echo "RELEASE_STORE_FILE=$keystore_file"
               echo "RELEASE_STORE_PASSWORD=$RELEASE_STORE_PASSWORD_SECRET"
               echo "RELEASE_KEY_ALIAS=$RELEASE_KEY_ALIAS_SECRET"
               echo "RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD_SECRET"
@@ -69,46 +92,290 @@ jobs:
         env:
           TZ: Asia/Shanghai
         run: |
-          # Version format: yyyyMMddHHmm, for example 202609242246.
-          version_name="$(date '+%Y%m%d%H%M')"
-          # Use Unix seconds for versionCode: monotonic, unique, and below Android's 2.1B limit until 2036.
-          version_code="$(date '+%s')"
+          # Both channels use the calendar version name; versionCode identifies each build.
+          version_name="$(date '+%y.%-m.%-d')"
+          test_version_name="${version_name}"
+          # Keep versionCode within Android's signed Int range while changing every CI build.
+          version_code="$(($(date '+%y%m%d') * 1000 + GITHUB_RUN_NUMBER))"
+          short_sha="${GITHUB_SHA:0:7}"
           echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
+          echo "test_version_name=$test_version_name" >> "$GITHUB_OUTPUT"
           echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
-          echo "tag=v$version_name" >> "$GITHUB_OUTPUT"
-          echo "Generated version: $version_name (versionCode: $version_code)"
-
+          echo "stable_tag=v$version_name" >> "$GITHUB_OUTPUT"
+          echo "test_tag=test-$test_version_name-$short_sha" >> "$GITHUB_OUTPUT"
+          echo "Generated version: stable=$version_name test=$test_version_name (versionCode: $version_code)"
       - name: Build release APK
-        run: ./gradlew :app:assembleRelease --no-daemon --console=plain -PversionName=${{ steps.release.outputs.version_name }} -PversionCode=${{ steps.release.outputs.version_code }}
+        run: ./gradlew :app:assembleRelease --no-daemon --console=plain -PversionName=${{ github.event_name == 'push' && steps.release.outputs.test_version_name || steps.release.outputs.version_name }} -PversionCode=${{ steps.release.outputs.version_code }}
+
+      - name: Build standalone admin release APK
+        run: ./gradlew :admin:assembleRelease --no-daemon --console=plain -PversionName=${{ github.event_name == 'push' && steps.release.outputs.test_version_name || steps.release.outputs.version_name }} -PversionCode=${{ steps.release.outputs.version_code }}
+
+      - name: Upload standalone admin release APK artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: DAuxiliary-admin-release-${{ github.sha }}
+          path: admin/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Upload release APK artifact
-        uses: actions/upload-artifact@v4
+
+        uses: actions/upload-artifact@v5
         with:
           name: DAuxiliary-release-${{ github.sha }}
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish GitHub Release
-        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+      - name: Prepare concise release notes
+        id: notes
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        env:
+          INPUT_NOTES: ${{ inputs.release_notes }}
+        run: |
+          notes_file="$RUNNER_TEMP/dauxiliary-release-notes.md"
+          if [ -n "$INPUT_NOTES" ]; then
+            printf '%s\n' "$INPUT_NOTES" > "$notes_file"
+          else
+            base_sha="${{ github.event.before }}"
+            if [ -n "$base_sha" ] && [ "$base_sha" != "0000000000000000000000000000000000000000" ] && git cat-file -e "${base_sha}^{commit}" 2>/dev/null; then
+              commits="$(git log --pretty=%s "${base_sha}..${GITHUB_SHA}")"
+            else
+              echo "Previous commit $base_sha is unavailable in this checkout; collecting available commit subjects instead."
+              commits="$(git log -n 12 --pretty=%s "${GITHUB_SHA}")"
+            fi
+            export RELEASE_COMMIT_SUBJECTS="$commits"
+            python3 - <<'PY' > "$notes_file"
+          import os
+          import re
+
+          commits = os.environ.get("RELEASE_COMMIT_SUBJECTS", "").splitlines()
+          groups = {"增加": [], "修复": [], "优化": [], "变更": []}
+          emoji = re.compile("[\\U0001F000-\\U0001FAFF\\u2600-\\u27BF]")
+          for raw in commits:
+              text = emoji.sub("", raw.strip())
+              if not text:
+                  continue
+              match = re.match(r"^(feat|feature|add|新增|增加|fix|bug|修复|perf|refactor|optimize|优化)\\s*[:：]\\s*", text, re.I)
+              prefix = match.group(1).lower() if match else ""
+              if prefix in ("feat", "feature", "add", "新增", "增加"):
+                  category = "增加"
+              elif prefix in ("fix", "bug", "修复"):
+                  category = "修复"
+              elif prefix in ("perf", "refactor", "optimize", "优化"):
+                  category = "优化"
+              else:
+                  category = "变更"
+              if match:
+                  text = text[match.end():]
+              text = text.strip(" -:：")
+              if text and text not in groups[category]:
+                  groups[category].append(text[:100])
+          for category in ("增加", "修复", "优化", "变更"):
+              if groups[category]:
+                  print(f"*{category}*")
+                  for item in groups[category][:5]:
+                      escaped = re.sub(r"([_\\*\\[\\]()~`>#+\\-=|{}.!])", r"\\\\\\1", item)
+                      print(f"- {escaped}")
+          PY
+          fi
+          if [ ! -s "$notes_file" ]; then
+            printf '%s\n' '*变更*' '- 本次版本包含功能调整、问题修复和稳定性优化。' > "$notes_file"
+          fi
+          echo "notes_file=$notes_file" >> "$GITHUB_OUTPUT"
+
+      # Every push to Test publishes a prerelease consumed by the Test channel.
+      # Manual runs additionally publish a stable release consumed by the Stable channel.
+      - name: Publish Test prerelease
+        if: github.event_name == 'push' && github.ref == 'refs/heads/Test'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          release_tag="${{ steps.release.outputs.test_tag }}"
+          notes_file="${{ steps.notes.outputs.notes_file }}"
+          printf '\n版本：%s\nversionCode：%s\n' "${{ steps.release.outputs.test_version_name }}" "${{ steps.release.outputs.version_code }}" >> "$notes_file"
+          gh release create "$release_tag" app/build/outputs/apk/release/*.apk \
+            --prerelease \
+            --title "DAuxiliary 测试版 ${{ steps.release.outputs.test_version_name }}" \
+            --notes-file "$notes_file" \
+            --target "$GITHUB_SHA"
+
+      - name: Publish stable GitHub Release
+        if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_NOTES: ${{ inputs.release_notes }}
         run: |
-          release_tag="${{ steps.release.outputs.tag }}"
-          if gh release view "$release_tag" >/dev/null 2>&1; then
-            echo "Release $release_tag already exists; skip duplicate publication."
-            exit 0
-          fi
+          release_tag="${{ steps.release.outputs.stable_tag }}"
           release_args=(
             "$release_tag"
             app/build/outputs/apk/release/*.apk
             --title "DAuxiliary v${{ steps.release.outputs.version_name }}"
             --target "$GITHUB_SHA"
           )
+          notes_file="${{ steps.notes.outputs.notes_file }}"
           if [ -n "$RELEASE_NOTES" ]; then
-            printf '%s\n' "$RELEASE_NOTES" > "$RUNNER_TEMP/release-notes.md"
-            gh release create "${release_args[@]}" --notes-file "$RUNNER_TEMP/release-notes.md"
-          else
-            gh release create "${release_args[@]}" --generate-notes
+            printf '%s\n' "$RELEASE_NOTES" > "$notes_file"
           fi
+          printf '\n版本：%s\nversionCode：%s\n' "${{ steps.release.outputs.version_name }}" "${{ steps.release.outputs.version_code }}" >> "$notes_file"
+          gh release create "${release_args[@]}" --notes-file "$notes_file"
+
+      # Automatically send the APK only to the Telegram channel.
+      # Personal chat secrets are intentionally not used here.
+      - name: Send release APK to Telegram channel
+        if: github.event_name == 'push' && github.ref == 'refs/heads/Test'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+          RELEASE_NOTES_FILE: ${{ steps.notes.outputs.notes_file }}
+          VERSION_NAME: ${{ steps.release.outputs.version_name }}
+          VERSION_CODE: ${{ steps.release.outputs.version_code }}
+          TEST_TAG: ${{ steps.release.outputs.test_tag }}
+          STABLE_TAG: ${{ steps.release.outputs.stable_tag }}
+          EVENT_NAME: ${{ github.event_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHANNEL_ID" ]; then
+            echo "Telegram channel secrets are not configured; skip notification."
+            exit 0
+          fi
+          telegram_chat_ids="$TELEGRAM_CHANNEL_ID"
+
+           apk_file=$(find app/build/outputs/apk/release -type f -name '*.apk' -print -quit)
+           if [ -z "$apk_file" ] || [ ! -f "$apk_file" ]; then
+             echo "APK not found"
+             find app/build/outputs/apk/release -maxdepth 2 -type f -print || true
+             exit 1
+           fi
+           apk_file="$(realpath "$apk_file")"
+           if [ ! -r "$apk_file" ]; then
+             echo "APK is not readable: $apk_file"
+             ls -l "$apk_file" || true
+             exit 1
+           fi
+           upload_file="$RUNNER_TEMP/dauxiliary-release.apk"
+           cp "$apk_file" "$upload_file"
+           if [ ! -s "$upload_file" ]; then
+             echo "Temporary APK copy is missing or empty: $upload_file"
+             exit 1
+           fi
+           dd if="$upload_file" of=/dev/null bs=1 count=1 status=none
+           echo "Uploading APK through curl stdin: $upload_file"
+           stat "$upload_file"
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            channel="测试版"
+            release_tag="$TEST_TAG"
+          else
+            channel="正式版"
+            release_tag="$STABLE_TAG"
+          fi
+          release_url="https://github.com/${REPOSITORY}/releases/tag/${release_tag}"
+
+          notes=$(cat "$RELEASE_NOTES_FILE")
+          notes=$(printf '%s' "$notes" | sed -E 's/[[:space:]]+$//' | head -c 600)
+          export TELEGRAM_NOTES="$notes"
+          export TELEGRAM_RELEASE_URL="$release_url"
+          export TELEGRAM_CHANNEL="$channel"
+          export TELEGRAM_VERSION_NAME="$VERSION_NAME"
+          export TELEGRAM_VERSION_CODE="$VERSION_CODE"
+          caption=$(python3 - <<'PY'
+          import os
+
+          notes = os.environ["TELEGRAM_NOTES"]
+          # Telegram uses MarkdownV2 here. Escape every user/release-note character
+          # instead of mixing GitHub Markdown with Telegram's different grammar.
+          reserved = r"_[]()~`>#+-=|{}.!\\"
+          def escape(text):
+              return "".join("\\" + char if char in reserved else char for char in text)
+
+          note_lines = []
+          for line in notes.splitlines():
+              if line.startswith("- "):
+                  line = "• " + line[2:]
+              note_lines.append(escape(line))
+
+          notes = "\n".join(note_lines).strip() or "暂无更新说明"
+          channel = escape(os.environ["TELEGRAM_CHANNEL"])
+          version = escape(os.environ["TELEGRAM_VERSION_NAME"])
+          code = escape(os.environ["TELEGRAM_VERSION_CODE"])
+          url = os.environ["TELEGRAM_RELEASE_URL"].replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+          print(f"*DAuxiliary {channel}*\n版本：{version}\nversionCode：{code}\n\n*更新内容*\n{notes}\n\n[GitHub Release 下载页面]({url})")
+          PY
+          )
+
+          export TELEGRAM_CHAT_IDS="$telegram_chat_ids"
+          export TELEGRAM_CAPTION="$caption"
+          response=$(UPLOAD_FILE="$upload_file" python3 - <<'PY'
+          import os
+          import sys
+          import urllib.error
+          import urllib.request
+          import uuid
+
+          boundary = "----DAuxiliary" + uuid.uuid4().hex
+          upload_file = os.environ["UPLOAD_FILE"]
+          token = os.environ["TELEGRAM_BOT_TOKEN"]
+          chat_ids = os.environ["TELEGRAM_CHAT_IDS"].splitlines()
+          caption = os.environ["TELEGRAM_CAPTION"]
+
+          def text_part(name, value):
+              return (
+                  f"--{boundary}\r\n"
+                  f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+                  f"{value}\r\n"
+              ).encode("utf-8")
+
+          with open(upload_file, "rb") as source:
+              apk = source.read()
+
+          file_part = (
+              f"--{boundary}\r\n"
+              'Content-Disposition: form-data; name="document"; filename="dauxiliary-release.apk"\r\n'
+              "Content-Type: application/vnd.android.package-archive\r\n\r\n"
+          ).encode("ascii") + apk + b"\r\n"
+
+          failed = False
+          for chat_id in chat_ids:
+              chat_id = chat_id.strip()
+              if not chat_id:
+                  continue
+              body = (
+                  text_part("chat_id", chat_id)
+                   + file_part
+                   + text_part("caption", caption)
+                   + text_part("parse_mode", "MarkdownV2")
+                   + f"--{boundary}--\r\n".encode("ascii")
+              )
+              request = urllib.request.Request(
+                  f"https://api.telegram.org/bot{token}/sendDocument",
+                  data=body,
+                  headers={
+                      "Content-Type": f"multipart/form-data; boundary={boundary}",
+                      "Content-Length": str(len(body)),
+                  },
+                  method="POST",
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=120) as result:
+                      payload = result.read().decode("utf-8")
+              except urllib.error.HTTPError as error:
+                  payload = error.read().decode("utf-8", errors="replace")
+              except Exception as error:
+                  print(f"Telegram upload failed for destination {chat_id}: {error}", file=sys.stderr)
+                  failed = True
+                  continue
+              try:
+                  import json
+                  data = json.loads(payload)
+              except Exception:
+                  data = {"ok": False}
+              if data.get("ok"):
+                  print(f"Telegram upload succeeded for destination {chat_id}")
+              else:
+                  print(f"Telegram upload failed for destination {chat_id}: {payload}", file=sys.stderr)
+                  failed = True
+          sys.exit(1 if failed else 0)
+          PY
+          )

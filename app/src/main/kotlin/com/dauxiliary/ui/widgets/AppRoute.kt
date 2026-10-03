@@ -16,4 +16,7 @@ sealed interface AppRoute : NavKey {
 
     @Serializable
     data object About : AppRoute
+
+    @Serializable
+    data object AuthorizationAdmin : AppRoute
 }

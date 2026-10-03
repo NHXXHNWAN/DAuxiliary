@@ -2,33 +2,77 @@ package com.dauxiliary.core.config
 
 import android.content.Context
 import com.dauxiliary.core.registry.AppTarget
-import de.robv.android.xposed.XSharedPreferences
 
 /** Shared module configuration and host heartbeat access. */
 object ConfigStore {
-    private const val PREFS_FILE = "daux_config"
+    const val REMOTE_PREFS_GROUP = "daux_config"
+    private const val PREFS_FILE = REMOTE_PREFS_GROUP
+
     const val KEY_FLOATING_NAVIGATION_BAR_STYLE = "floating_navigation_bar_style"
     const val KEY_COLOR_MODE = "color_mode"
     const val KEY_ENABLED_APPLICATIONS = "enabled_applications"
     const val KEY_BACKGROUND_EFFECT_VARIANT = "background_effect_variant"
     const val KEY_DYNAMIC_BACKGROUND = "dynamic_background"
     const val KEY_FULLSCREEN_BACKGROUND = "fullscreen_background"
+    const val KEY_UPDATE_CHANNEL = "update_channel"
+    const val KEY_TELEGRAM_AUTHORIZED = "telegram_authorized"
+    const val KEY_APPLICATION_SELECTION_INITIALIZED = "application_selection_initialized"
     private const val KEY_HOST_FEATURE_PREFIX = "enabled_features_"
     private const val KEY_HOST_LAST_SEEN_PREFIX = "host_last_seen_"
     private const val HOST_ACTIVE_WINDOW_MS = 5 * 60 * 1000L
     private const val MODULE_PACKAGE = "com.dauxiliary"
-    private val DEFAULT_ENABLED_APPLICATIONS = setOf("com.ss.android.ugc.aweme")
+    private val DEFAULT_ENABLED_APPLICATIONS = AppTarget.entries.mapTo(linkedSetOf()) { it.packageName }
+    private val DEFAULT_ENABLED_FEATURES = setOf(
+        "home.module_settings",
+        "telegram.host_support",
+        "telegram.auto_sign",
+        "qq.anti_recall",
+        "qq.disable_poke_effect",
+    )
 
-    fun enabledApplicationPackages(context: Context): Set<String> =
-        prefs(context).getStringSet(KEY_ENABLED_APPLICATIONS, DEFAULT_ENABLED_APPLICATIONS).orEmpty()
+    @Volatile
+    private var remotePreferences: android.content.SharedPreferences? = null
+
+    fun defaultEnabledApplications(): Set<String> = DEFAULT_ENABLED_APPLICATIONS
+
+    fun attachRemotePreferences(preferences: android.content.SharedPreferences) {
+        remotePreferences = preferences
+    }
+
+    fun ensureApplicationDefaults(context: Context) {
+        if (context.packageName != MODULE_PACKAGE) return
+        val preferences = prefs(context)
+        if (!preferences.getBoolean(KEY_APPLICATION_SELECTION_INITIALIZED, false)) {
+            preferences.edit()
+                .putStringSet(KEY_ENABLED_APPLICATIONS, DEFAULT_ENABLED_APPLICATIONS)
+                .putBoolean(KEY_APPLICATION_SELECTION_INITIALIZED, true)
+                .apply()
+        }
+    }
+
+    fun isTelegramAuthorized(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_TELEGRAM_AUTHORIZED, false)
+
+    fun setTelegramAuthorized(context: Context, authorized: Boolean) =
+        prefs(context).edit().putBoolean(KEY_TELEGRAM_AUTHORIZED, authorized).apply()
+
+    fun enabledApplicationPackages(context: Context): Set<String> {
+        val preferences = prefs(context)
+        if (context.packageName == MODULE_PACKAGE &&
+            !preferences.getBoolean(KEY_APPLICATION_SELECTION_INITIALIZED, false)
+        ) {
+            return DEFAULT_ENABLED_APPLICATIONS
+        }
+        return preferences.getStringSet(KEY_ENABLED_APPLICATIONS, DEFAULT_ENABLED_APPLICATIONS).orEmpty()
+    }
 
     fun enabledApplicationCount(context: Context): Int = enabledApplicationPackages(context).size
 
     fun enabledFeatureIds(context: Context, host: AppTarget): Set<String> =
         if (context.packageName == MODULE_PACKAGE) {
-            prefs(context).getStringSet(featureKey(host), emptySet()).orEmpty()
+            prefs(context).getStringSet(featureKey(host), DEFAULT_ENABLED_FEATURES).orEmpty()
         } else {
-            hookedPreferences()?.getStringSet(featureKey(host), emptySet()).orEmpty()
+            remotePreferences?.getStringSet(featureKey(host), DEFAULT_ENABLED_FEATURES).orEmpty()
         }
 
     fun setFeatureEnabled(context: Context, host: AppTarget, featureId: String, enabled: Boolean) {
@@ -38,8 +82,12 @@ object ConfigStore {
     }
 
     fun prefs(context: Context) =
-        context.createPackageContext(MODULE_PACKAGE, Context.CONTEXT_IGNORE_SECURITY)
-            .getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
+        if (context.packageName == MODULE_PACKAGE) {
+            context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
+        } else {
+            context.createPackageContext(MODULE_PACKAGE, Context.CONTEXT_IGNORE_SECURITY)
+                .getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
+        }
 
     /** Host process reports through the module-owned provider; no local flag is fabricated. */
     fun recordHostLoaded(context: Context, host: AppTarget) {
@@ -61,35 +109,37 @@ object ConfigStore {
     fun setApplicationEnabled(context: Context, packageName: String, enabled: Boolean) {
         val current = enabledApplicationPackages(context).toMutableSet()
         if (enabled) current += packageName else current -= packageName
-        prefs(context).edit().putStringSet(KEY_ENABLED_APPLICATIONS, current).apply()
+        prefs(context).edit()
+            .putStringSet(KEY_ENABLED_APPLICATIONS, current)
+            .putBoolean(KEY_APPLICATION_SELECTION_INITIALIZED, true)
+            .apply()
     }
 
     fun isApplicationEnabled(context: Context, packageName: String): Boolean =
         enabledApplicationPackages(context).contains(packageName)
 
     fun readFromHookedProcess(key: String, default: Boolean): Boolean =
-        hookedPreferences()?.getBoolean(key, default) ?: default
+        remotePreferences?.getBoolean(key, default) ?: default
 
     fun readEnabledApplicationCount(): Int =
-        hookedPreferences()?.getStringSet(KEY_ENABLED_APPLICATIONS, emptySet())?.size ?: 0
+        remotePreferences?.getStringSet(KEY_ENABLED_APPLICATIONS, emptySet())?.size ?: 0
 
     fun isApplicationEnabledInHookedProcess(packageName: String): Boolean =
-        hookedPreferences()?.getStringSet(KEY_ENABLED_APPLICATIONS, DEFAULT_ENABLED_APPLICATIONS)
+        remotePreferences?.getStringSet(KEY_ENABLED_APPLICATIONS, DEFAULT_ENABLED_APPLICATIONS)
             ?.contains(packageName) == true
+
+    fun isFeatureEnabledInHookedProcess(host: AppTarget, featureId: String): Boolean =
+        remotePreferences?.getStringSet(featureKey(host), DEFAULT_ENABLED_FEATURES)
+            ?.contains(featureId) == true
 
     private fun featureKey(host: AppTarget) = KEY_HOST_FEATURE_PREFIX + host.name.lowercase()
     private fun lastSeenKey(host: AppTarget) = KEY_HOST_LAST_SEEN_PREFIX + host.name.lowercase()
 
-    @Volatile
-    private var cached: XSharedPreferences? = null
-
-    private fun hookedPreferences(): XSharedPreferences? {
-        cached?.reload()
-        return cached ?: runCatching {
-            XSharedPreferences(MODULE_PACKAGE, PREFS_FILE).apply {
-                makeWorldReadable()
-                reload()
-            }.also { cached = it }
-        }.getOrNull()
-    }
+    /**
+     * Modern LibXposed modules must use remote preferences instead of legacy
+     * XSharedPreferences. The module app remains the single source of truth;
+     * hooked processes receive a read-only proxy through the module interface.
+     */
+    fun readRemotePreferences(xposed: io.github.libxposed.api.XposedInterface): android.content.SharedPreferences =
+        xposed.getRemotePreferences(PREFS_FILE)
 }

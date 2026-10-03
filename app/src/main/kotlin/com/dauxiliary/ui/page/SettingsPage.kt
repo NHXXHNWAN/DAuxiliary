@@ -1,6 +1,6 @@
 package com.dauxiliary.ui.page
-
 import androidx.compose.runtime.Composable
+
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
@@ -8,10 +8,13 @@ import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 @Composable
 fun SettingsPage(
     onAboutClick: () -> Unit,
+    onAuthorizationAdminClick: () -> Unit,
     colorMode: Int,
     onColorModeChange: (Int) -> Unit,
     floatingNavigationBarStyle: Int,
     onFloatingNavigationBarStyleChange: (Int) -> Unit,
+    updateChannel: Int,
+    onUpdateChannelChange: (Int) -> Unit,
 ) {
     GroupedPage(title = "设置") {
         item { SmallTitle(text = "外观") }
@@ -28,6 +31,27 @@ fun SettingsPage(
                     items = listOf("Default", "iOS-like"),
                     selectedIndex = floatingNavigationBarStyle.coerceIn(0, 1),
                     onSelectedIndexChange = onFloatingNavigationBarStyleChange,
+                )
+            }
+        }
+        item { SmallTitle(text = "更新") }
+        item {
+            GroupCard {
+                OverlayDropdownPreference(
+                    title = "更新通道",
+                    items = listOf("稳定版（Release）", "测试版（Test）", "不检查更新"),
+                    selectedIndex = updateChannel.coerceIn(0, 2),
+                    onSelectedIndexChange = onUpdateChannelChange,
+                )
+            }
+        }
+        item { SmallTitle(text = "Telegram 管理") }
+        item {
+            GroupCard {
+                ArrowPreference(
+                    title = "Telegram 授权管理",
+                    summary = "管理模块授权、Bot 管理员与维护者",
+                    onClick = onAuthorizationAdminClick,
                 )
             }
         }

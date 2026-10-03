@@ -1,78 +1,62 @@
 package com.dauxiliary.ui.page
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dauxiliary.core.update.UpdateInfo
-import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun UpdateCard(
     update: UpdateInfo,
-    darkTheme: Boolean,
+    isDownloading: Boolean,
     onUpdateClick: () -> Unit,
+    onLongClick: () -> Unit,
 ) {
-    val cardColor = if (darkTheme) Color(0xFF3E4654) else Color(0xFFE8EDF5)
-    val titleColor = if (darkTheme) MiuixTheme.colorScheme.onSurface else Color(0xFF20242B)
-    val summaryColor = if (darkTheme) Color(0xFFC0CAD8) else Color(0xFF5B6572)
+    val titleColor = MiuixTheme.colorScheme.onSurface
+    val summaryColor = MiuixTheme.colorScheme.onSurfaceVariantSummary
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        cornerRadius = 20.dp,
-        colors = CardDefaults.defaultColors(
-            color = cardColor,
-            contentColor = titleColor,
-        ),
+            .padding(horizontal = 16.dp)
+            .combinedClickable(
+                role = Role.Button,
+                onClick = onUpdateClick,
+                onLongClick = onLongClick,
+                enabled = !isDownloading,
+            ),
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Text(
-                text = "发现新版本",
-                color = titleColor,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = "v${update.currentVersion} → v${update.latestVersion}",
-                color = summaryColor,
-                fontSize = 14.sp,
-            )
-            Spacer(Modifier.height(14.dp))
-            Text(
-                text = "更新内容",
-                color = titleColor,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = update.releaseNotes,
-                color = summaryColor,
-                fontSize = 14.sp,
-                maxLines = 8,
-            )
-            Spacer(Modifier.height(16.dp))
-            Row(modifier = Modifier.fillMaxWidth()) {
-                Spacer(Modifier.weight(1f))
-                Button(onClick = onUpdateClick) {
-                    Text("更新")
-                }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (isDownloading) "正在下载更新" else "发现新版本",
+                    color = titleColor,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.size(2.dp))
+                Text(text = update.latestVersion, color = summaryColor, fontSize = 13.sp)
             }
         }
     }
