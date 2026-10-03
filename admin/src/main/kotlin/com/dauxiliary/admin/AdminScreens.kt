@@ -171,9 +171,11 @@ internal fun AdminDashboard(
     connected: Boolean,
     busy: Boolean,
     message: String,
-    targetId: String,
+    roleTargetId: String,
+    revokeTargetId: String,
     revokeConfirmation: Boolean,
-    onTargetIdChange: (String) -> Unit,
+    onRoleTargetIdChange: (String) -> Unit,
+    onRevokeTargetIdChange: (String) -> Unit,
     onEdit: () -> Unit,
     onAdd: () -> Unit,
     onSwitch: (AdminAccount) -> Unit,
@@ -297,9 +299,9 @@ internal fun AdminDashboard(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         TextField(
-                            value = targetId,
-                            onValueChange = onTargetIdChange,
-                            label = "Telegram 数字 ID",
+                            value = roleTargetId,
+                            onValueChange = onRoleTargetIdChange,
+                            label = "角色管理 · Telegram 数字 ID",
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         )
@@ -337,6 +339,13 @@ internal fun AdminDashboard(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text("撤销指定 Telegram 用户的模块授权，并清除其未兑换授权码。")
+                        TextField(
+                            value = revokeTargetId,
+                            onValueChange = onRevokeTargetIdChange,
+                            label = "授权管理 · Telegram 数字 ID",
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        )
                         if (!revokeConfirmation) {
                             Button(
                                 onClick = onAskRevoke,
@@ -345,7 +354,7 @@ internal fun AdminDashboard(
                             ) { Text("撤销用户授权…") }
                         } else {
                             Text(
-                                text = "确认撤销 ID 为 $targetId 的授权？此操作无法直接恢复。",
+                                text = "确认撤销 ID 为 $revokeTargetId 的授权？此操作无法直接恢复。",
                                 color = MiuixTheme.colorScheme.error,
                             )
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

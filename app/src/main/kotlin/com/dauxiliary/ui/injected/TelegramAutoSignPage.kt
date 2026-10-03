@@ -110,7 +110,7 @@ internal fun TelegramAutoSignPage() {
         item { SmallTitle(text = "使用说明") }
         item {
             InjectedGroupCard {
-                BasicComponent(title = "获取授权码", summary = "在 Telegram Bot 私聊发送 /code；每次生成的新码会使该账号之前未兑换的旧码失效。")
+                BasicComponent(title = "获取授权码", summary = "在 Telegram Bot 私聊发送 /code。同一账号已有未兑换授权码时会返回原码；已授权后不会再次发码。")
                 BasicComponent(title = "一次性绑定", summary = "授权码完全随机、10 分钟过期、只能兑换一次，成功后绑定发码账号的 Telegram ID。")
                 BasicComponent(title = "与 Bot 管理员授权分离", summary = "/auth 和 /revoke 只管理 Bot 管理员权限，不会授予或撤销模块授权。")
             }

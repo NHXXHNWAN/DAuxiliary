@@ -29,9 +29,29 @@ class TelegramAuthStore {
 
   async issue(payload) {
     const userId = validateUserId(payload?.userId);
+    const moduleRecord = await this.storage.get(`module:${userId}`);
+    if (moduleRecord) {
+      return this.reply({
+        already_authorized: true,
+        module_authorized: true,
+        telegram_id: userId,
+      });
+    }
+
     const activeKey = `active_code:${userId}`;
     const previousCode = await this.storage.get(activeKey);
-    if (previousCode) await this.storage.delete(`code:${previousCode}`);
+    if (previousCode) {
+      const previousRecord = await this.storage.get(`code:${previousCode}`);
+      if (previousRecord?.expiresAt > Date.now()) {
+        return this.reply({
+          code: previousCode,
+          expires_in: Math.max(1, Math.ceil((previousRecord.expiresAt - Date.now()) / 1000)),
+          reused: true,
+        });
+      }
+      await this.storage.delete(`code:${previousCode}`);
+      await this.storage.delete(activeKey);
+    }
 
     let code;
     do {
@@ -41,7 +61,7 @@ class TelegramAuthStore {
     await this.storage.put(`code:${code}`, { userId, createdAt: now, expiresAt: now + CODE_TTL_MS });
     await this.storage.put(activeKey, code);
     await this.increment("issued");
-    return this.reply({ code, expires_in: CODE_TTL_MS / 1000 });
+    return this.reply({ code, expires_in: CODE_TTL_MS / 1000, reused: false });
   }
 
   async redeem(payload) {

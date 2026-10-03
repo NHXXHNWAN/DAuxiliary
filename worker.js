@@ -193,11 +193,16 @@ async function issueAuthCode(env, chatId, userId, chatType) {
   }
   try {
     const result = await authStore(env, "/issue", "POST", { userId });
+    if (result.already_authorized) {
+      await sendText(env, chatId, "你的 Telegram 模块已经授权，无需再次申请授权码。若要重新绑定，请先使用 /module_revoke 撤销后再申请。\n当前绑定 Telegram ID：" + result.telegram_id);
+      return;
+    }
     await sendText(env, chatId, [
-      "你的 Telegram 模块授权码：",
+      result.reused ? "你当前仍有未兑换的授权码：" : "你的 Telegram 模块授权码：",
       result.code,
       "",
-      "有效期 10 分钟、仅能兑换一次，兑换后绑定你的 Telegram 账号。",
+      `有效期约 ${Math.ceil(Number(result.expires_in || 0) / 60)} 分钟；同一账号重复发送 /code 不会生成新码。`,
+      "授权码只能兑换一次，兑换后绑定你的 Telegram 账号。",
     ].join("\n"));
   } catch (error) {
     await sendText(env, chatId, "生成授权码失败：" + safeError(error));
