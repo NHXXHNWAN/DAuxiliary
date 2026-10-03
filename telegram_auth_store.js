@@ -198,8 +198,17 @@ class TelegramAuthStore {
     const codes = await this.storage.list({ prefix: "code:" });
     let activeCodes = 0;
     for (const [key, value] of codes) {
-      if (value?.expiresAt > now) activeCodes += 1;
-      else await this.storage.delete(key);
+      if (value?.expiresAt > now) {
+        activeCodes += 1;
+      } else {
+        await this.storage.delete(key);
+        if (value?.userId) {
+          const activeKey = `active_code:${value.userId}`;
+          if ((await this.storage.get(activeKey)) === key.slice("code:".length)) {
+            await this.storage.delete(activeKey);
+          }
+        }
+      }
     }
     const modules = await this.storage.list({ prefix: "module:" });
     const bots = await this.storage.list({ prefix: "bot_admin:" });

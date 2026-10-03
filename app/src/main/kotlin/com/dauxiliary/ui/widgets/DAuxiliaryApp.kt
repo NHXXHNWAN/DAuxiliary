@@ -20,7 +20,6 @@ import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.core.update.UpdateInfo
 import com.dauxiliary.ui.miuix.component.liquid.IosLiquidGlassNavigationBar
 import com.dauxiliary.ui.page.AboutPage
-import com.dauxiliary.ui.page.AuthorizationAdminPage
 import com.dauxiliary.ui.page.HomePage
 import com.dauxiliary.ui.page.LocalNavigationPadding
 import com.dauxiliary.ui.page.ManagePage
@@ -53,14 +52,10 @@ fun DAuxiliaryApp(
                 colorMode = colorMode,
                 onColorModeChange = onColorModeChange,
                 onAboutClick = { backStack.add(AppRoute.About) },
-                onAuthorizationAdminClick = { backStack.add(AppRoute.AuthorizationAdmin) },
             )
         }
         entry<AppRoute.About>(swipeDismiss = NavSwipeDirection.LeftToRight) {
             AboutPage(onBack = { backStack.removeLastOrNull() })
-        }
-        entry<AppRoute.AuthorizationAdmin>(swipeDismiss = NavSwipeDirection.LeftToRight) {
-            AuthorizationAdminPage(onBack = { backStack.removeLastOrNull() })
         }
     }
 }
@@ -70,20 +65,14 @@ private fun MainNavigation(
     colorMode: Int,
     onColorModeChange: (Int) -> Unit,
     onAboutClick: () -> Unit,
-    onAuthorizationAdminClick: () -> Unit,
 ) {
     val context = LocalContext.current
     var navigationBarStyle by rememberSaveable {
-        mutableIntStateOf(
-            ConfigStore.prefs(context).getInt(ConfigStore.KEY_FLOATING_NAVIGATION_BAR_STYLE, 0),
-        )
+        mutableIntStateOf(ConfigStore.prefs(context).getInt(ConfigStore.KEY_FLOATING_NAVIGATION_BAR_STYLE, 0))
     }
     var updateChannel by rememberSaveable {
-        mutableIntStateOf(
-            ConfigStore.prefs(context).getInt(ConfigStore.KEY_UPDATE_CHANNEL, 0),
-        )
+        mutableIntStateOf(ConfigStore.prefs(context).getInt(ConfigStore.KEY_UPDATE_CHANNEL, 0))
     }
-
     var homeUpdate by remember { mutableStateOf<UpdateInfo?>(null) }
     var homeUpdateChecked by remember { mutableStateOf(false) }
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 3 })
@@ -159,7 +148,6 @@ private fun MainNavigation(
                         1 -> ManagePage()
                         2 -> SettingsPage(
                             onAboutClick = onAboutClick,
-                            onAuthorizationAdminClick = onAuthorizationAdminClick,
                             colorMode = colorMode,
                             onColorModeChange = onColorModeChange,
                             floatingNavigationBarStyle = navigationBarStyle,

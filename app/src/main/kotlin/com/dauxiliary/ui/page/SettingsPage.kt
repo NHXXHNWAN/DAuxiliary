@@ -1,14 +1,13 @@
 package com.dauxiliary.ui.page
+
 import androidx.compose.runtime.Composable
 
 import top.yukonga.miuix.kmp.basic.SmallTitle
-import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 
 @Composable
 fun SettingsPage(
     onAboutClick: () -> Unit,
-    onAuthorizationAdminClick: () -> Unit,
     colorMode: Int,
     onColorModeChange: (Int) -> Unit,
     floatingNavigationBarStyle: Int,
@@ -45,20 +44,10 @@ fun SettingsPage(
                 )
             }
         }
-        item { SmallTitle(text = "Telegram 管理") }
-        item {
-            GroupCard {
-                ArrowPreference(
-                    title = "Telegram 授权管理",
-                    summary = "管理模块授权、Bot 管理员与维护者",
-                    onClick = onAuthorizationAdminClick,
-                )
-            }
-        }
         item { SmallTitle(text = "应用信息") }
         item {
             GroupCard {
-                ArrowPreference(
+                top.yukonga.miuix.kmp.preference.ArrowPreference(
                     title = "关于 DAuxiliary",
                     summary = "版本、项目介绍与开源许可",
                     onClick = onAboutClick,
