@@ -104,11 +104,22 @@ jobs:
           echo "stable_tag=v$version_name" >> "$GITHUB_OUTPUT"
           echo "test_tag=test-$test_version_name-$short_sha" >> "$GITHUB_OUTPUT"
           echo "Generated version: stable=$version_name test=$test_version_name (versionCode: $version_code)"
-
       - name: Build release APK
         run: ./gradlew :app:assembleRelease --no-daemon --console=plain -PversionName=${{ github.event_name == 'push' && steps.release.outputs.test_version_name || steps.release.outputs.version_name }} -PversionCode=${{ steps.release.outputs.version_code }}
 
+      - name: Build standalone admin APK
+        run: ./gradlew :admin:assembleDebug --no-daemon --console=plain
+
+      - name: Upload standalone admin APK artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: DAuxiliary-admin-${{ github.sha }}
+          path: admin/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload release APK artifact
+
         uses: actions/upload-artifact@v5
         with:
           name: DAuxiliary-release-${{ github.sha }}
