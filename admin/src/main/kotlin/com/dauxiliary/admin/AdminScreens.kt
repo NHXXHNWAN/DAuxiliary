@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,6 +30,7 @@ import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
@@ -219,8 +221,12 @@ internal fun AdminDashboard(
     onConfirmRevoke: () -> Unit,
 ) {
     var userFilter by rememberSaveable { mutableStateOf("") }
+    var selectedTab by rememberSaveable { mutableStateOf(0) }
     var pendingRoleAction by remember { mutableStateOf<String?>(null) }
     val scrollBehavior = MiuixScrollBehavior()
+    val users = summary?.optJSONArray("users")?.let { array ->
+        (0 until array.length()).mapNotNull { array.optJSONObject(it) }
+    }
 
     Scaffold(
         topBar = {
@@ -231,254 +237,343 @@ internal fun AdminDashboard(
             )
         },
     ) { padding ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .overScrollVertical()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = padding.calculateTopPadding() + 4.dp,
-                bottom = padding.calculateBottomPadding() + 24.dp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(padding),
         ) {
-            item {
-                SmallTitle(text = "连接")
-                Card(Modifier.fillMaxWidth()) {
-                    Column {
-                        BasicComponent(
-                            title = active?.name ?: "未配置",
-                            summary = if (busy) "处理中" else active?.endpoint.orEmpty(),
-                        )
-                        if (accounts.size > 1) {
-                            accounts.filter { it.name != active?.name }.forEach { account ->
-                                ArrowPreference(
-                                    title = "切换到 ${account.name}",
-                                    onClick = { onSwitch(account) },
-                                )
-                            }
-                        }
-                        ArrowPreference(
-                            title = if (active == null) "配置连接" else "编辑连接",
-                            summary = "地址与 Token",
-                            onClick = onEdit,
-                        )
-                        ArrowPreference(
-                            title = "添加连接",
-                            summary = "新增 Worker",
-                            onClick = onAdd,
-                        )
-                        ArrowPreference(
-                            title = if (busy) "处理中" else "刷新",
-                            summary = "更新数据",
-                            onClick = { if (!busy) onRefresh() },
-                        )
-                    }
-                }
-            }
-
-            if (message.isNotBlank()) {
-                item {
-                    Card(Modifier.fillMaxWidth()) {
-                        BasicComponent(title = message)
-                    }
-                }
-            }
-
-            item {
-                SmallTitle(text = "授权概览")
-                if (summary == null) {
-                    Card(Modifier.fillMaxWidth()) {
-                        if (busy) {
-                            BasicComponent(title = "加载中")
-                        } else {
-                            BasicComponent(
-                                title = "暂无数据",
-                                summary = if (connected) "点击刷新" else "先配置连接",
-                            )
-                        }
-                    }
-
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            MetricCard("模块授权", summary.optString("module_authorized_count", "0"), Modifier.weight(1f))
-                            MetricCard("有效授权码", summary.optString("active_code_count", "0"), Modifier.weight(1f))
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            MetricCard("Bot 管理员", summary.optString("bot_admin_count", "0"), Modifier.weight(1f))
-                            MetricCard("维护者", summary.optString("maintainer_count", "0"), Modifier.weight(1f))
-                        }
+            TabRow(
+                tabs = listOf("总览", "用户", "Bot", "模块"),
+                selectedTabIndex = selectedTab,
+                onTabSelected = { selectedTab = it },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .overScrollVertical()
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 12.dp,
+                    bottom = 28.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (message.isNotBlank()) {
+                    item {
                         Card(Modifier.fillMaxWidth()) {
-                            BasicComponent(
-                                title = "授权码",
-                                summary = "发 ${summary.optString("issued_count", "0")} · 换 ${summary.optString("redeemed_count", "0")} · 撤 ${summary.optString("revoked_count", "0")}",
-                            )
+                            BasicComponent(title = message)
                         }
                     }
                 }
-            }
 
-            item {
-                SmallTitle(text = "已授权用户")
-                val users = summary?.optJSONArray("users")
-                if (users == null) {
-                    Card(Modifier.fillMaxWidth()) {
-                        BasicComponent(title = "未加载")
-                    }
-                } else if (users.length() == 0) {
-                    Card(Modifier.fillMaxWidth()) {
-                        BasicComponent(title = "暂无用户")
-                    }
-                } else {
-                    Card(Modifier.fillMaxWidth()) {
-                        Column {
-                            TextField(
-                                value = userFilter,
-                                onValueChange = { userFilter = it.filter(Char::isDigit) },
-                                label = "Telegram ID",
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            )
-                            val matchingUsers = (0 until users.length())
-                                .mapNotNull { users.optJSONObject(it) }
-                                .filter { it.optString("telegram_id").contains(userFilter) }
-                            Text(
-                                text = "${matchingUsers.size}/${users.length()}",
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            )
-                            if (matchingUsers.isEmpty()) {
-                                BasicComponent(title = "无匹配用户")
-                            }
-                            matchingUsers.forEach { user ->
-                                val id = user.optString("telegram_id")
-                                val isSelected = id == roleTargetId || id == revokeTargetId
-                                val method = user.optString("method").takeIf { it.isNotBlank() && it != "unknown" }
-                                val detail = buildString {
-                                    append("授权 ${formatTimestamp(user.optString("granted_at"))}")
-                                    append(" · 校验 ${formatTimestamp(user.optString("last_verified_at"))}")
-                                    if (method != null) append(" · $method")
-                                    if (isSelected) append(" · 已选")
+                when (selectedTab) {
+                    0 -> {
+                        item {
+                            SmallTitle(text = "连接")
+                            Card(Modifier.fillMaxWidth()) {
+                                Column {
+                                    val connectionState = when {
+                                        busy -> "正在处理"
+                                        connected -> "已连接"
+                                        active != null -> "未连接"
+                                        else -> "尚未配置"
+                                    }
+                                    val host = active?.endpoint?.removePrefix("https://")
+                                        ?.removePrefix("http://")?.substringBefore('/')
+                                    BasicComponent(
+                                        title = active?.name ?: "配置管理连接",
+                                        summary = listOfNotNull(connectionState, host).joinToString(" · "),
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        Button(
+                                            onClick = onRefresh,
+                                            enabled = active != null && !busy,
+                                            modifier = Modifier.weight(1f),
+                                            colors = ButtonDefaults.buttonColorsPrimary(),
+                                        ) { Text(if (busy) "处理中" else "刷新数据") }
+                                        Button(
+                                            onClick = onEdit,
+                                            enabled = !busy,
+                                            modifier = Modifier.weight(1f),
+                                        ) { Text("连接设置") }
+                                    }
+                                    if (accounts.size > 1) {
+                                        accounts.filter { it.name != active?.name }.forEach { account ->
+                                            ArrowPreference(
+                                                title = "切换到 ${account.name}",
+                                                onClick = { if (!busy) onSwitch(account) },
+                                            )
+                                        }
+                                    }
+                                    ArrowPreference(
+                                        title = "添加连接",
+                                        summary = "添加另一个 Worker",
+                                        onClick = onAdd,
+                                    )
                                 }
-                                BasicComponent(
-                                    title = "Telegram ID $id",
-                                    summary = detail,
-                                    onClick = { onUserSelect(id) },
-                                )
+                            }
+                        }
+                        item {
+                            SmallTitle(text = "授权概览")
+                            if (summary == null) {
+                                Card(Modifier.fillMaxWidth()) {
+                                    BasicComponent(
+                                        title = if (busy) "正在加载" else "暂无数据",
+                                        summary = if (active == null) "先配置管理连接" else "下拉刷新或点按上方刷新数据",
+                                    )
+                                }
+                            } else {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        MetricCard(
+                                            "模块授权",
+                                            summary.optString("module_authorized_count", "0"),
+                                            Modifier.weight(1f),
+                                        )
+                                        MetricCard(
+                                            "有效授权码",
+                                            summary.optString("active_code_count", "0"),
+                                            Modifier.weight(1f),
+                                        )
+                                    }
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        MetricCard(
+                                            "Bot 管理员",
+                                            summary.optString("bot_admin_count", "0"),
+                                            Modifier.weight(1f),
+                                        )
+                                        MetricCard(
+                                            "维护者",
+                                            summary.optString("maintainer_count", "0"),
+                                            Modifier.weight(1f),
+                                        )
+                                    }
+                                    Card(Modifier.fillMaxWidth()) {
+                                        BasicComponent(
+                                            title = "授权码统计",
+                                            summary = "已发 ${summary.optString("issued_count", "0")}  ·  已兑换 ${summary.optString("redeemed_count", "0")}  ·  已撤销 ${summary.optString("revoked_count", "0")}",
+                                        )
+                                    }
+                                    summary.optString("generated_at").takeIf { it.isNotBlank() }?.let { generatedAt ->
+                                        Text(
+                                            text = "更新于 ${formatTimestamp(generatedAt)}",
+                                            style = MiuixTheme.textStyles.footnote1,
+                                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                            modifier = Modifier.padding(horizontal = 4.dp),
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
-                }
-                summary?.optString("generated_at")?.takeIf { it.isNotBlank() }?.let { generatedAt ->
-                    Text(
-                        text = formatTimestamp(generatedAt),
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
-                    )
-                }
-            }
 
-            item {
-                SmallTitle(text = "Bot 角色")
-                Card(Modifier.fillMaxWidth()) {
-                    Column {
-                        RoleList(
-                            title = "维护者",
-                            values = roles?.optJSONArray("maintainers"),
-                            onUserSelect = onUserSelect,
-                        )
-                        RoleList(
-                            title = "Bot 管理员",
-                            values = roles?.optJSONArray("admins"),
-                            onUserSelect = onUserSelect,
-                        )
-
-                    }
-                }
-                Text(
-                    text = "角色记录可点选 ID · 与模块授权独立",
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
-                )
-            }
-
-            item {
-                SmallTitle(text = "Bot 角色管理")
-                Card(Modifier.fillMaxWidth()) {
-                    Column(
-                        Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        TextField(
-                            value = roleTargetId,
-                            onValueChange = { onRoleTargetIdChange(it.filter(Char::isDigit)) },
-                            label = "ID",
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                onClick = { pendingRoleAction = "maintainer:grant" },
-                                enabled = !busy && roleTargetId.isNotBlank(),
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColorsPrimary(),
-                            ) { Text("设为维护者") }
-                            Button(
-                                onClick = { pendingRoleAction = "maintainer:revoke" },
-                                enabled = !busy && roleTargetId.isNotBlank(),
-                                modifier = Modifier.weight(1f),
-                            ) { Text("移除维护者") }
+                    1 -> {
+                        item {
+                            SmallTitle(text = "已授权用户")
+                            Card(Modifier.fillMaxWidth()) {
+                                Column {
+                                    TextField(
+                                        value = userFilter,
+                                        onValueChange = { userFilter = it.filter(Char::isDigit) },
+                                        label = "搜索 Telegram ID",
+                                        singleLine = true,
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    )
+                                    Text(
+                                        text = if (users == null) "尚未加载" else "${users.count { it.optString("telegram_id").contains(userFilter) }} / ${users.size} 人",
+                                        style = MiuixTheme.textStyles.footnote1,
+                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                    )
+                                }
+                            }
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                onClick = { pendingRoleAction = "bot_admin:grant" },
-                                enabled = !busy && roleTargetId.isNotBlank(),
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColorsPrimary(),
-                            ) { Text("设为 Bot 管理员") }
-                            Button(
-                                onClick = { pendingRoleAction = "bot_admin:revoke" },
-                                enabled = !busy && roleTargetId.isNotBlank(),
-                                modifier = Modifier.weight(1f),
-                            ) { Text("移除管理员") }
+                        if (users == null) {
+                            item {
+                                Card(Modifier.fillMaxWidth()) {
+                                    BasicComponent(
+                                        title = if (busy) "正在加载用户" else "暂无用户数据",
+                                        summary = if (connected) "刷新后重试" else "请先连接管理 Worker",
+                                    )
+                                }
+                            }
+                        } else {
+                            val matchingUsers = users.filter { it.optString("telegram_id").contains(userFilter) }
+                            if (matchingUsers.isEmpty()) {
+                                item {
+                                    Card(Modifier.fillMaxWidth()) {
+                                        BasicComponent(title = if (users.isEmpty()) "暂无已授权用户" else "没有匹配的用户")
+                                    }
+                                }
+                            } else {
+                                items(matchingUsers, key = { it.optString("telegram_id") }) { user ->
+                                    val id = user.optString("telegram_id")
+                                    val selected = id == revokeTargetId
+                                    val method = user.optString("method").takeIf { it.isNotBlank() && it != "unknown" }
+                                    val detail = buildString {
+                                        append("授权于 ${formatTimestamp(user.optString("granted_at"))}")
+                                        method?.let { append(" · $it") }
+                                    }
+                                    Card(Modifier.fillMaxWidth()) {
+                                        Column {
+                                            BasicComponent(
+                                                title = "Telegram ID  $id${if (selected) " · 模块操作对象" else ""}",
+                                                summary = detail,
+                                            )
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                                                horizontalArrangement = Arrangement.End,
+                                            ) {
+                                                TextButton(
+                                                    text = "Bot 角色",
+                                                    onClick = {
+                                                        onUserSelect(id)
+                                                        selectedTab = 2
+                                                    },
+                                                )
+                                                TextButton(
+                                                    text = "模块授权",
+                                                    onClick = {
+                                                        onRevokeTargetIdChange(id)
+                                                        selectedTab = 3
+                                                    },
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            summary.optString("generated_at").takeIf { it.isNotBlank() }?.let { generatedAt ->
+                                item {
+                                    Text(
+                                        text = "数据更新于 ${formatTimestamp(generatedAt)}",
+                                        style = MiuixTheme.textStyles.footnote1,
+                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                        modifier = Modifier.padding(horizontal = 4.dp),
+                                    )
+                                }
+                            }
+                        }
+                        if (roleTargetId.isNotBlank() || revokeTargetId.isNotBlank()) {
+                            item {
+                                Card(Modifier.fillMaxWidth()) {
+                                    BasicComponent(
+                                        title = "当前操作对象",
+                                        summary = "Bot 角色：${roleTargetId.ifBlank { "未选择" }} · 模块授权：${revokeTargetId.ifBlank { "未选择" }}",
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    2 -> {
+                        item {
+                            SmallTitle(text = "Bot 角色")
+                            Card(Modifier.fillMaxWidth()) {
+                                Column {
+                                    RoleList(
+                                        title = "维护者",
+                                        values = roles?.optJSONArray("maintainers"),
+                                        onUserSelect = onUserSelect,
+                                    )
+                                    RoleList(
+                                        title = "Bot 管理员",
+                                        values = roles?.optJSONArray("admins"),
+                                        onUserSelect = onUserSelect,
+                                    )
+                                }
+                            }
+                        }
+                        item {
+                            SmallTitle(text = "调整角色")
+                            Card(Modifier.fillMaxWidth()) {
+                                Column(
+                                    Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    TextField(
+                                        value = roleTargetId,
+                                        onValueChange = { onRoleTargetIdChange(it.filter(Char::isDigit)) },
+                                        label = "Telegram 用户 ID",
+                                        singleLine = true,
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    )
+                                    if (roleTargetId.isBlank()) {
+                                        Text(
+                                            text = "从用户列表点选 ID，或在此输入数字 ID。",
+                                            style = MiuixTheme.textStyles.footnote1,
+                                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                        )
+                                    }
+                                    RoleActionRow(
+                                        title = "维护者",
+                                        telegramId = roleTargetId,
+                                        values = roles?.optJSONArray("maintainers"),
+                                        busy = busy,
+                                        onGrant = { pendingRoleAction = "maintainer:grant" },
+                                        onRevoke = { pendingRoleAction = "maintainer:revoke" },
+                                    )
+                                    RoleActionRow(
+                                        title = "Bot 管理员",
+                                        telegramId = roleTargetId,
+                                        values = roles?.optJSONArray("admins"),
+                                        busy = busy,
+                                        onGrant = { pendingRoleAction = "bot_admin:grant" },
+                                        onRevoke = { pendingRoleAction = "bot_admin:revoke" },
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "Bot 角色与 DAuxiliary 模块授权互相独立。",
+                                style = MiuixTheme.textStyles.footnote1,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                modifier = Modifier.padding(horizontal = 4.dp),
+                            )
+                        }
+                    }
+
+                    else -> {
+                        item {
+                            SmallTitle(text = "模块授权")
+                            Card(Modifier.fillMaxWidth()) {
+                                Column(
+                                    Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    TextField(
+                                        value = revokeTargetId,
+                                        onValueChange = { onRevokeTargetIdChange(it.filter(Char::isDigit)) },
+                                        label = "Telegram 用户 ID",
+                                        singleLine = true,
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    )
+                                    Text(
+                                        text = "撤销后该用户的模块凭据失效，未兑换授权码将被清除。Bot 角色不会改变。",
+                                        style = MiuixTheme.textStyles.body2,
+                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                    )
+                                    Button(
+                                        onClick = onAskRevoke,
+                                        enabled = !busy && revokeTargetId.isNotBlank() && !revokeConfirmation,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) { Text(if (busy) "处理中" else "撤销模块授权") }
+                                }
+                            }
+                            Text(
+                                text = "此操作不可撤销，提交前请核对用户 ID。",
+                                style = MiuixTheme.textStyles.footnote1,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                modifier = Modifier.padding(horizontal = 4.dp),
+                            )
                         }
                     }
                 }
-            }
-
-            item {
-                SmallTitle(text = "模块授权")
-                Card(Modifier.fillMaxWidth()) {
-                    Column(
-                        Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text("撤销后凭据失效，未兑换授权码清除。")
-                        TextField(
-                            value = revokeTargetId,
-                            onValueChange = { onRevokeTargetIdChange(it.filter(Char::isDigit)) },
-                            label = "ID",
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        )
-                        Button(
-                            onClick = onAskRevoke,
-                            enabled = !busy && revokeTargetId.isNotBlank() && !revokeConfirmation,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text(if (busy) "处理中…" else "撤销模块授权…") }
-                    }
-                }
-            }
-            item {
-                Text(
-                    text = "HTTPS · Bearer Token",
-                    style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    modifier = Modifier.padding(horizontal = 4.dp),
-                )
             }
         }
     }
@@ -486,7 +581,7 @@ internal fun AdminDashboard(
     if (revokeConfirmation) {
         ConfirmDialog(
             title = "撤销模块授权？",
-            message = "撤销 $revokeTargetId 的模块授权？",
+            message = "撤销 $revokeTargetId 的模块授权？此操作不可撤销。",
             confirmLabel = "确认撤销",
             destructive = true,
             onDismiss = onCancelRevoke,
@@ -498,11 +593,12 @@ internal fun AdminDashboard(
         val parts = action.split(':', limit = 2)
         val role = parts.getOrNull(0).orEmpty()
         val grant = parts.getOrNull(1) == "grant"
+        val targetId = roleTargetId
         val roleTitle = if (role == "maintainer") "维护者" else "Bot 管理员"
         ConfirmDialog(
-            title = if (grant) "授予$roleTitle？" else "撤销$roleTitle？",
-            message = "${if (grant) "授予" else "撤销"} $roleTargetId 的$roleTitle？",
-            confirmLabel = if (grant) "确认授予" else "确认撤销",
+            title = if (grant) "授予$roleTitle？" else "移除$roleTitle？",
+            message = "${if (grant) "授予" else "移除"} Telegram ID $targetId 的$roleTitle？",
+            confirmLabel = if (grant) "确认授予" else "确认移除",
             destructive = !grant,
             onDismiss = { pendingRoleAction = null },
             onConfirm = {
@@ -510,6 +606,47 @@ internal fun AdminDashboard(
                 onRoleChange(role, grant)
             },
         )
+    }
+}
+
+@Composable
+private fun RoleActionRow(
+    title: String,
+    telegramId: String,
+    values: JSONArray?,
+    busy: Boolean,
+    onGrant: () -> Unit,
+    onRevoke: () -> Unit,
+) {
+    val assigned = values?.let { array ->
+        (0 until array.length()).any { array.optJSONObject(it)?.optString("telegram_id") == telegramId }
+    } ?: false
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        BasicComponent(
+            title = title,
+            summary = when {
+                telegramId.isBlank() -> "先选择用户 ID"
+                values == null -> "角色列表尚未加载"
+                assigned -> "该用户已有此角色"
+                else -> "该用户未设置此角色"
+            },
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Button(
+                onClick = onGrant,
+                enabled = !busy && telegramId.isNotBlank(),
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColorsPrimary(),
+            ) { Text("授予") }
+            Button(
+                onClick = onRevoke,
+                enabled = !busy && telegramId.isNotBlank(),
+                modifier = Modifier.weight(1f),
+            ) { Text("移除") }
+        }
     }
 }
 
@@ -527,7 +664,6 @@ private fun RoleList(
         summary = if (values == null) "未加载" else "${records.size} 个",
     )
     if (values != null && records.isEmpty()) {
-
         Text(
             text = "暂无$title",
             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
@@ -538,8 +674,10 @@ private fun RoleList(
             val id = record.optString("telegram_id")
             BasicComponent(
                 title = "Telegram ID $id",
-                summary = "授予 ${formatTimestamp(record.optString("granted_at"))} · ${record.optString("granted_by").ifBlank { "未知" }}",
-                onClick = { onUserSelect(id) },
+                summary = "授予 ${formatTimestamp(record.optString("granted_at"))} · ${record.optString("granted_by").ifBlank { "未知" }} · 点按后转到 Bot 角色页",
+                onClick = {
+                    onUserSelect(id)
+                },
             )
         }
     }
@@ -594,7 +732,6 @@ private fun MetricCard(label: String, value: String, modifier: Modifier = Modifi
         }
     }
 }
-
 private fun formatTimestamp(value: String): String = when {
     value.isBlank() || value == "null" -> "暂无"
     else -> value.replace("T", " ").removeSuffix(".000Z").removeSuffix("Z")

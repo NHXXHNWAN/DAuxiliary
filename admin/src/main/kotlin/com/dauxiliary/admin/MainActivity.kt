@@ -313,8 +313,7 @@ private fun AdminApp() {
             onRevokeTargetIdChange = { revokeTargetId = it.filter(Char::isDigit) },
             onUserSelect = { id ->
                 roleTargetId = id
-                revokeTargetId = id
-                message = "已选择 Telegram ID $id"
+                message = "已选择 Telegram ID $id，用于 Bot 角色操作"
             },
             onEdit = {
                 accountName = active?.name.orEmpty()
