@@ -30,12 +30,17 @@ import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
-import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.basic.NavigationBar
+import top.yukonga.miuix.kmp.basic.NavigationBarItem
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.basic.Check
+import top.yukonga.miuix.kmp.icon.basic.Sidebar
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -223,18 +228,19 @@ internal fun AdminDashboard(
     var userFilter by rememberSaveable { mutableStateOf("") }
     var selectedTab by rememberSaveable { mutableStateOf(0) }
     var pendingRoleAction by remember { mutableStateOf<String?>(null) }
-    val scrollBehavior = MiuixScrollBehavior()
     val users = summary?.optJSONArray("users")?.let { array ->
         (0 until array.length()).mapNotNull { array.optJSONObject(it) }
     }
+    val pageTitles = listOf("总览", "用户", "Bot 角色", "模块授权")
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = "授权管理",
-                largeTitle = "授权管理",
-                scrollBehavior = scrollBehavior,
-            )
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(selectedTab == 0, { selectedTab = 0 }, MiuixIcons.Basic.Check, "总览")
+                NavigationBarItem(selectedTab == 1, { selectedTab = 1 }, MiuixIcons.Basic.Sidebar, "用户")
+                NavigationBarItem(selectedTab == 2, { selectedTab = 2 }, MiuixIcons.Basic.Sidebar, "Bot")
+                NavigationBarItem(selectedTab == 3, { selectedTab = 3 }, MiuixIcons.Basic.Sidebar, "模块")
+            }
         },
     ) { padding ->
         Column(
@@ -242,25 +248,31 @@ internal fun AdminDashboard(
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            TabRow(
-                tabs = listOf("总览", "用户", "Bot", "模块"),
-                selectedTabIndex = selectedTab,
-                onTabSelected = { selectedTab = it },
-                modifier = Modifier.fillMaxWidth(),
-            )
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .overScrollVertical()
-                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    .overScrollVertical(),
                 contentPadding = PaddingValues(
                     start = 16.dp,
                     end = 16.dp,
-                    top = 12.dp,
-                    bottom = 28.dp,
+                    top = 24.dp,
+                    bottom = 24.dp,
                 ),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                item {
+                    Text(pageTitles[selectedTab], style = MiuixTheme.textStyles.title1)
+                    Text(
+                        text = when (selectedTab) {
+                            0 -> active?.name?.let { "管理工作台 · $it" } ?: "管理工作台"
+                            1 -> "查找用户并选择对应的管理操作"
+                            2 -> "Bot 角色独立于模块授权"
+                            else -> "管理 DAuxiliary 模块访问权限"
+                        },
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                }
                 if (message.isNotBlank()) {
                     item {
                         Card(Modifier.fillMaxWidth()) {

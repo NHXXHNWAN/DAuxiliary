@@ -32,8 +32,9 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.basic.Check
-import top.yukonga.miuix.kmp.icon.basic.Sidebar
+import top.yukonga.miuix.kmp.icon.extended.Home
+import top.yukonga.miuix.kmp.icon.extended.Settings
+import top.yukonga.miuix.kmp.icon.extended.Layers
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.rememberNavBackStack
 import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
@@ -84,9 +85,9 @@ private fun MainNavigation(
     }
     val navigationItems = remember {
         listOf(
-            NavigationItem("首页", MiuixIcons.Basic.Check),
-            NavigationItem("管理", MiuixIcons.Basic.Sidebar),
-            NavigationItem("设置", MiuixIcons.Basic.Sidebar),
+            NavigationItem("首页", MiuixIcons.Home),
+            NavigationItem("管理", MiuixIcons.Layers),
+            NavigationItem("设置", MiuixIcons.Settings),
         )
     }
 
@@ -109,19 +110,19 @@ private fun MainNavigation(
                     FloatingNavigationBarItem(
                         selected = pagerState.currentPage == 0,
                         onClick = { selectPage(0) },
-                        icon = MiuixIcons.Basic.Check,
+                        icon = MiuixIcons.Home,
                         label = "首页",
                     )
                     FloatingNavigationBarItem(
                         selected = pagerState.currentPage == 1,
                         onClick = { selectPage(1) },
-                        icon = MiuixIcons.Basic.Sidebar,
+                        icon = MiuixIcons.Layers,
                         label = "管理",
                     )
                     FloatingNavigationBarItem(
                         selected = pagerState.currentPage == 2,
                         onClick = { selectPage(2) },
-                        icon = MiuixIcons.Basic.Sidebar,
+                        icon = MiuixIcons.Settings,
                         label = "设置",
                     )
                 }

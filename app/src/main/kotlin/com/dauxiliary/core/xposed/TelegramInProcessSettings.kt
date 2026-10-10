@@ -104,6 +104,7 @@ internal object TelegramInProcessSettings {
         init {
             // The registry must be attached before Compose starts reading saveable state.
             savedStateController.performAttach()
+            savedStateController.performRestore(null)
             lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
             // Keep the owner at CREATED while Compose registers saveable state.
             // It is advanced after the view has been attached.
