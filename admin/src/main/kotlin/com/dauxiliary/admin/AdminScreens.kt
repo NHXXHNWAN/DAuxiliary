@@ -34,13 +34,14 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TopAppBar
-import top.yukonga.miuix.kmp.basic.NavigationBar
-import top.yukonga.miuix.kmp.basic.NavigationBarItem
+import top.yukonga.miuix.kmp.basic.FloatingNavigationBar
+import top.yukonga.miuix.kmp.basic.FloatingNavigationBarItem
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Check
-import top.yukonga.miuix.kmp.icon.basic.Sidebar
-import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
-
+import top.yukonga.miuix.kmp.icon.extended.Home
+import top.yukonga.miuix.kmp.icon.extended.Layers
+import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -94,7 +95,20 @@ internal fun ConnectionScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item {
-                SmallTitle(text = "连接")
+                Column(
+                    Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(if (isEditing) "编辑连接" else "配置连接", style = MiuixTheme.textStyles.title1)
+                    Text(
+                        "管理 Worker 使用 HTTPS 连接，凭据仅保存在本机。",
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                }
+            }
+            item {
+                SmallTitle(text = "连接信息")
                 Card(Modifier.fillMaxWidth()) {
                     Column(
                         Modifier.padding(16.dp),
@@ -153,31 +167,29 @@ internal fun ConnectionScreen(
                 }
             }
             if (savedAccounts.isNotEmpty()) {
-                item {
-                    SmallTitle(text = "已保存")
+                item { SmallTitle(text = "已保存") }
+                items(savedAccounts, key = { it.name }) { account ->
+                    val isActive = account.name == activeAccountName
                     Card(Modifier.fillMaxWidth()) {
                         Column {
-                            savedAccounts.forEach { account ->
-                                val isActive = account.name == activeAccountName
-                                BasicComponent(
-                                    title = account.name + if (isActive) " · 当前" else "",
-                                    summary = account.endpoint,
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                                    horizontalArrangement = Arrangement.End,
-                                ) {
-                                    if (!isActive) {
-                                        TextButton(
-                                            text = "切换",
-                                            onClick = { onSwitch(account) },
-                                        )
-                                    }
+                            BasicComponent(
+                                title = account.name + if (isActive) " · 当前" else "",
+                                summary = account.endpoint,
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                                horizontalArrangement = Arrangement.End,
+                            ) {
+                                if (!isActive) {
                                     TextButton(
-                                        text = "移除",
-                                        onClick = { deleteCandidate = account },
+                                        text = "切换",
+                                        onClick = { onSwitch(account) },
                                     )
                                 }
+                                TextButton(
+                                    text = "移除",
+                                    onClick = { deleteCandidate = account },
+                                )
                             }
                         }
                     }
@@ -231,47 +243,66 @@ internal fun AdminDashboard(
     val users = summary?.optJSONArray("users")?.let { array ->
         (0 until array.length()).mapNotNull { array.optJSONObject(it) }
     }
-    val pageTitles = listOf("总览", "用户", "Bot 角色", "模块授权")
-
+    val pageTitles = listOf("管理概览", "用户", "Bot 角色", "模块授权")
     Scaffold(
         bottomBar = {
-            NavigationBar {
-                NavigationBarItem(selectedTab == 0, { selectedTab = 0 }, MiuixIcons.Basic.Check, "总览")
-                NavigationBarItem(selectedTab == 1, { selectedTab = 1 }, MiuixIcons.Basic.Sidebar, "用户")
-                NavigationBarItem(selectedTab == 2, { selectedTab = 2 }, MiuixIcons.Basic.Sidebar, "Bot")
-                NavigationBarItem(selectedTab == 3, { selectedTab = 3 }, MiuixIcons.Basic.Sidebar, "模块")
+            FloatingNavigationBar(horizontalOutSidePadding = 20.dp) {
+                FloatingNavigationBarItem(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    icon = MiuixIcons.Home,
+                    label = "总览",
+                )
+                FloatingNavigationBarItem(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    icon = MiuixIcons.Layers,
+                    label = "用户",
+                )
+                FloatingNavigationBarItem(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    icon = MiuixIcons.Check,
+                    label = "Bot 角色",
+                )
+                FloatingNavigationBarItem(
+                    selected = selectedTab == 3,
+                    onClick = { selectedTab = 3 },
+                    icon = MiuixIcons.Settings,
+                    label = "模块授权",
+                )
             }
         },
     ) { padding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
+                .overScrollVertical(),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = padding.calculateTopPadding() + 12.dp,
+                bottom = padding.calculateBottomPadding() + 16.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .overScrollVertical(),
-                contentPadding = PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = 24.dp,
-                    bottom = 24.dp,
-                ),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                item {
-                    Text(pageTitles[selectedTab], style = MiuixTheme.textStyles.title1)
-                    Text(
-                        text = when (selectedTab) {
-                            0 -> active?.name?.let { "管理工作台 · $it" } ?: "管理工作台"
-                            1 -> "查找用户并选择对应的管理操作"
-                            2 -> "Bot 角色独立于模块授权"
-                            else -> "管理 DAuxiliary 模块访问权限"
-                        },
-                        style = MiuixTheme.textStyles.footnote1,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    )
+            item {
+                    Column(
+                        Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(pageTitles[selectedTab], style = MiuixTheme.textStyles.title1)
+                        Text(
+                            text = when (selectedTab) {
+                                0 -> active?.name ?: "管理工作台"
+                                1 -> "${users?.size ?: 0} 位已授权用户"
+                                2 -> "维护者与 Bot 管理员"
+                                else -> "DAuxiliary 模块访问权限"
+                            },
+                            style = MiuixTheme.textStyles.footnote1,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        )
+                    }
                 }
                 if (message.isNotBlank()) {
                     item {
@@ -284,20 +315,18 @@ internal fun AdminDashboard(
                 when (selectedTab) {
                     0 -> {
                         item {
-                            SmallTitle(text = "连接")
+                            SmallTitle(text = "工作连接")
                             Card(Modifier.fillMaxWidth()) {
                                 Column {
                                     val connectionState = when {
-                                        busy -> "正在处理"
-                                        connected -> "已连接"
-                                        active != null -> "未连接"
+                                        busy -> "正在同步"
+                                        connected -> "服务在线"
+                                        active != null -> "连接不可用"
                                         else -> "尚未配置"
                                     }
-                                    val host = active?.endpoint?.removePrefix("https://")
-                                        ?.removePrefix("http://")?.substringBefore('/')
                                     BasicComponent(
                                         title = active?.name ?: "配置管理连接",
-                                        summary = listOfNotNull(connectionState, host).joinToString(" · "),
+                                        summary = "$connectionState · ${active?.endpoint?.substringAfter("://")?.substringBefore('/') ?: "未设置 Worker"}",
                                     )
                                     Row(
                                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
@@ -308,27 +337,33 @@ internal fun AdminDashboard(
                                             enabled = active != null && !busy,
                                             modifier = Modifier.weight(1f),
                                             colors = ButtonDefaults.buttonColorsPrimary(),
-                                        ) { Text(if (busy) "处理中" else "刷新数据") }
+                                        ) { Text(if (busy) "同步中" else "刷新数据") }
                                         Button(
                                             onClick = onEdit,
                                             enabled = !busy,
                                             modifier = Modifier.weight(1f),
-                                        ) { Text("连接设置") }
+                                        ) { Text("连接管理") }
                                     }
-                                    if (accounts.size > 1) {
-                                        accounts.filter { it.name != active?.name }.forEach { account ->
-                                            ArrowPreference(
-                                                title = "切换到 ${account.name}",
-                                                onClick = { if (!busy) onSwitch(account) },
-                                            )
-                                        }
-                                    }
-                                    ArrowPreference(
-                                        title = "添加连接",
-                                        summary = "添加另一个 Worker",
-                                        onClick = onAdd,
-                                    )
                                 }
+                            }
+                            if (accounts.size > 1) {
+                                SmallTitle(text = "其他连接")
+                                accounts.filter { it.name != active?.name }.forEach { account ->
+                                    Card(Modifier.fillMaxWidth()) {
+                                        ArrowPreference(
+                                            title = account.name,
+                                            summary = account.endpoint,
+                                            onClick = { if (!busy) onSwitch(account) },
+                                        )
+                                    }
+                                }
+                            }
+                            Card(Modifier.fillMaxWidth()) {
+                                ArrowPreference(
+                                    title = "添加连接",
+                                    summary = "添加另一个 Worker",
+                                    onClick = onAdd,
+                                )
                             }
                         }
                         item {
@@ -388,23 +423,19 @@ internal fun AdminDashboard(
                     1 -> {
                         item {
                             SmallTitle(text = "已授权用户")
-                            Card(Modifier.fillMaxWidth()) {
-                                Column {
-                                    TextField(
-                                        value = userFilter,
-                                        onValueChange = { userFilter = it.filter(Char::isDigit) },
-                                        label = "搜索 Telegram ID",
-                                        singleLine = true,
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    )
-                                    Text(
-                                        text = if (users == null) "尚未加载" else "${users.count { it.optString("telegram_id").contains(userFilter) }} / ${users.size} 人",
-                                        style = MiuixTheme.textStyles.footnote1,
-                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                    )
-                                }
-                            }
+                            TextField(
+                                value = userFilter,
+                                onValueChange = { userFilter = it.filter(Char::isDigit) },
+                                label = "搜索 Telegram ID",
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            )
+                            Text(
+                                text = if (users == null) "尚未加载" else "${users.count { it.optString("telegram_id").contains(userFilter) }} / ${users.size} 人",
+                                style = MiuixTheme.textStyles.footnote1,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+                            )
                         }
                         if (users == null) {
                             item {
@@ -587,13 +618,12 @@ internal fun AdminDashboard(
                     }
                 }
             }
-        }
     }
 
     if (revokeConfirmation) {
         ConfirmDialog(
             title = "撤销模块授权？",
-            message = "撤销 $revokeTargetId 的模块授权？此操作不可撤销。",
+            message = "Telegram ID $revokeTargetId 的模块凭据将失效，未兑换授权码会被清除。Bot 角色不受影响。",
             confirmLabel = "确认撤销",
             destructive = true,
             onDismiss = onCancelRevoke,
@@ -649,13 +679,13 @@ private fun RoleActionRow(
         ) {
             Button(
                 onClick = onGrant,
-                enabled = !busy && telegramId.isNotBlank(),
+                enabled = !busy && telegramId.isNotBlank() && values != null && !assigned,
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColorsPrimary(),
             ) { Text("授予") }
             Button(
                 onClick = onRevoke,
-                enabled = !busy && telegramId.isNotBlank(),
+                enabled = !busy && telegramId.isNotBlank() && values != null && assigned,
                 modifier = Modifier.weight(1f),
             ) { Text("移除") }
         }
