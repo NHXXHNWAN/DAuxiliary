@@ -1,7 +1,7 @@
 package com.dauxiliary.admin
-
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,9 +34,10 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TopAppBar
-import top.yukonga.miuix.kmp.basic.FloatingNavigationBar
-import top.yukonga.miuix.kmp.basic.FloatingNavigationBarItem
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.NavigationItem
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Check
 import top.yukonga.miuix.kmp.icon.extended.Home
@@ -245,6 +246,15 @@ internal fun AdminDashboard(
         (0 until array.length()).mapNotNull { array.optJSONObject(it) }
     }
     val pageTitles = listOf("管理概览", "用户", "Bot 角色", "模块授权")
+    val navigationItems = remember {
+        listOf(
+            NavigationItem("总览", MiuixIcons.Home),
+            NavigationItem("用户", MiuixIcons.Layers),
+            NavigationItem("Bot 角色", MiuixIcons.Basic.Check),
+            NavigationItem("模块授权", MiuixIcons.Settings),
+        )
+    }
+    val contentBackdrop = rememberLayerBackdrop()
     Scaffold(
         topBar = {
             TopAppBar(
@@ -254,37 +264,18 @@ internal fun AdminDashboard(
             )
         },
         bottomBar = {
-            FloatingNavigationBar(horizontalOutSidePadding = 20.dp) {
-                FloatingNavigationBarItem(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    icon = MiuixIcons.Home,
-                    label = "总览",
-                )
-                FloatingNavigationBarItem(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    icon = MiuixIcons.Layers,
-                    label = "用户",
-                )
-                FloatingNavigationBarItem(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
-                    icon = MiuixIcons.Basic.Check,
-                    label = "Bot 角色",
-                )
-                FloatingNavigationBarItem(
-                    selected = selectedTab == 3,
-                    onClick = { selectedTab = 3 },
-                    icon = MiuixIcons.Settings,
-                    label = "模块授权",
-                )
-            }
+            AdminLiquidNavigationBar(
+                items = navigationItems,
+                selectedIndex = selectedTab,
+                onItemClick = { selectedTab = it },
+                backdrop = contentBackdrop,
+            )
         },
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
+                .layerBackdrop(contentBackdrop)
                 .overScrollVertical()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
             contentPadding = PaddingValues(
