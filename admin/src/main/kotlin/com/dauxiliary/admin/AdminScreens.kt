@@ -240,11 +240,19 @@ internal fun AdminDashboard(
     var userFilter by rememberSaveable { mutableStateOf("") }
     var selectedTab by rememberSaveable { mutableStateOf(0) }
     var pendingRoleAction by remember { mutableStateOf<String?>(null) }
+    val scrollBehavior = MiuixScrollBehavior()
     val users = summary?.optJSONArray("users")?.let { array ->
         (0 until array.length()).mapNotNull { array.optJSONObject(it) }
     }
     val pageTitles = listOf("管理概览", "用户", "Bot 角色", "模块授权")
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = pageTitles[selectedTab],
+                largeTitle = pageTitles[selectedTab],
+                scrollBehavior = scrollBehavior,
+            )
+        },
         bottomBar = {
             FloatingNavigationBar(horizontalOutSidePadding = 20.dp) {
                 FloatingNavigationBarItem(
@@ -277,7 +285,8 @@ internal fun AdminDashboard(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .overScrollVertical(),
+                .overScrollVertical()
+                .nestedScroll(scrollBehavior.nestedScrollConnection),
             contentPadding = PaddingValues(
                 start = 16.dp,
                 end = 16.dp,
@@ -761,17 +770,10 @@ private fun ConfirmDialog(
 @Composable
 private fun MetricCard(label: String, value: String, modifier: Modifier = Modifier) {
     Card(modifier.fillMaxWidth()) {
-        Column(
-            Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                label,
-                style = MiuixTheme.textStyles.footnote1,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            )
-            Text(value, style = MiuixTheme.textStyles.title2)
-        }
+        BasicComponent(
+            title = label,
+            summary = value,
+        )
     }
 }
 private fun formatTimestamp(value: String): String = when {
