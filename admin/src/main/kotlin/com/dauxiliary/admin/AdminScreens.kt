@@ -270,7 +270,7 @@ internal fun AdminDashboard(
                 FloatingNavigationBarItem(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
-                    icon = MiuixIcons.Check,
+                    icon = MiuixIcons.Basic.Check,
                     label = "Bot 角色",
                 )
                 FloatingNavigationBarItem(
