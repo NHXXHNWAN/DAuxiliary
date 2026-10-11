@@ -1,0 +1,2 @@
+com.dauxiliary.core.xposed.EntryHook
+com.dauxiliary.core.xposed.PrimaryDexAnchor

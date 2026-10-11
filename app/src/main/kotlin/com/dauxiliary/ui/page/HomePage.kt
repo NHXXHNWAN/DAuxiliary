@@ -1,7 +1,11 @@
 package com.dauxiliary.ui.page
 
-import android.content.Intent
-import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -23,28 +28,50 @@ import androidx.compose.ui.unit.sp
 import com.dauxiliary.BuildConfig
 import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.core.registry.AppTarget
+import com.dauxiliary.core.update.ApkInstaller
+import com.dauxiliary.core.update.UpdateChannel
 import com.dauxiliary.core.update.UpdateChecker
 import com.dauxiliary.core.update.UpdateInfo
 import com.dauxiliary.ui.theme.isAppInDarkTheme
 import kotlinx.coroutines.delay
-import top.yukonga.miuix.kmp.basic.BasicComponent
-import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
-import top.yukonga.miuix.kmp.basic.Button
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
+import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /** Desktop overview with the module status and enabled host count. */
 @Composable
-fun HomePage() {
+fun HomePage(
+    updateChannelIndex: Int,
+    preservedUpdate: UpdateInfo?,
+    hasCheckedUpdate: Boolean,
+    onUpdateResult: (UpdateInfo?) -> Unit,
+) {
     val context = LocalContext.current
+    val updateScope = rememberCoroutineScope()
+    var isDownloading by remember { mutableStateOf(false) }
+    var showReleaseNotes by remember { mutableStateOf(false) }
+    val updateChannel = UpdateChannel.entries.getOrElse(updateChannelIndex) { UpdateChannel.STABLE }
     var refresh by remember { mutableIntStateOf(0) }
-    var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    val pullToRefreshState = rememberPullToRefreshState()
 
-    LaunchedEffect(Unit) {
-        updateInfo = UpdateChecker.check(BuildConfig.VERSION_NAME)
+    fun checkForUpdate() {
+        if (updateChannel == UpdateChannel.DISABLED) return
+        if (isRefreshing) return
+        isRefreshing = true
+        updateScope.launch {
+            onUpdateResult(UpdateChecker.check(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE, updateChannel))
+            isRefreshing = false
+        }
+    }
+
+    LaunchedEffect(updateChannel, hasCheckedUpdate) {
+        if (!hasCheckedUpdate) checkForUpdate()
     }
 
     LaunchedEffect(Unit) {
@@ -54,7 +81,6 @@ fun HomePage() {
         }
     }
 
-    val enabledHosts = ConfigStore.enabledApplicationPackages(context).size
     val moduleActive = remember(refresh) {
         AppTarget.entries.any { ConfigStore.isHostActive(context, it) }
     }
@@ -72,20 +98,22 @@ fun HomePage() {
     val titleColor = if (darkTheme) MiuixTheme.colorScheme.onSurface else Color(0xFF1F2421)
     val summaryColor = if (darkTheme) accentColor else Color(0xFF53605A)
 
-    GroupedPage(title = "主页") {
+    GroupedPage(
+        title = "主页",
+        isRefreshing = isRefreshing,
+        onRefresh = ::checkForUpdate,
+        pullToRefreshState = pullToRefreshState,
+    ) {
         item(key = "module_status_title") {
             SmallTitle(text = "DAuxiliary")
         }
         item(key = "module_status_card") {
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 cornerRadius = 20.dp,
-                colors = CardDefaults.defaultColors(
-                    color = cardColor,
-                    contentColor = titleColor,
-                ),
+                colors = CardDefaults.defaultColors(color = cardColor, contentColor = titleColor),
+                pressFeedbackType = top.yukonga.miuix.kmp.utils.PressFeedbackType.Tilt,
+                onClick = {},
             ) {
                 Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
                     Text(
@@ -110,31 +138,46 @@ fun HomePage() {
                 }
             }
         }
-        updateInfo?.let { update ->
-            item(key = "available_update") {
-                UpdateCard(
-                    update = update,
-                    darkTheme = darkTheme,
-                    onUpdateClick = {
-                        val target = Uri.parse(update.downloadUrl)
-                        context.startActivity(Intent(Intent.ACTION_VIEW, target))
-                    },
-                )
+
+        item(key = "update_slot") {
+            AnimatedVisibility(
+                visible = preservedUpdate != null,
+                enter = fadeIn(tween(350)) + expandVertically(tween(350)),
+                exit = fadeOut(tween(200)) + shrinkVertically(tween(200)),
+            ) {
+                preservedUpdate?.let { update ->
+                    UpdateCard(
+                        update = update,
+                        isDownloading = isDownloading,
+                        onUpdateClick = {
+                            if (!isDownloading) {
+                                isDownloading = true
+                                updateScope.launch {
+                                    ApkInstaller.downloadAndInstall(context, update.downloadUrl)
+                                    isDownloading = false
+                                }
+                            }
+                        },
+                        onLongClick = { showReleaseNotes = true },
+                    )
+                }
             }
         }
-        item(key = "enabled_hosts") {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-            ) {
-                BasicComponent(
-                    title = "已启用宿主",
-                    summary = enabledHosts.toString(),
-                    titleColor = BasicComponentDefaults.titleColor(MiuixTheme.colorScheme.onSurfaceVariantSummary),
-                    summaryColor = BasicComponentDefaults.summaryColor(MiuixTheme.colorScheme.onSurface),
-                )
-            }
+    }
+
+    preservedUpdate?.let { update ->
+        OverlayBottomSheet(
+            show = showReleaseNotes,
+            title = "${update.channel.label} ${update.latestVersion} 更新内容",
+            onDismissRequest = { showReleaseNotes = false },
+        ) {
+            Text(
+                text = update.releaseNotes,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                color = MiuixTheme.colorScheme.onSurface,
+                fontSize = 14.sp,
+            )
+            Spacer(Modifier.height(12.dp))
         }
     }
 }

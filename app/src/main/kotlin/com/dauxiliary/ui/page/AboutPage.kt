@@ -16,6 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -58,7 +59,7 @@ fun AboutPage(onBack: () -> Unit) {
             }
         }
     }
-    val collapsed by remember { derivedStateOf { scrollProgress >= 1f } }
+    val topAppBarScrollBehavior = MiuixScrollBehavior()
     val surface = MiuixTheme.colorScheme.surface
     val shaderSupported = remember { isRuntimeShaderSupported() }
     // Separate sources prevent a card from sampling its own rendered contents.
@@ -75,35 +76,49 @@ fun AboutPage(onBack: () -> Unit) {
         )
     }
     val cardColors = BlurDefaults.blurColors(blendColors = cardBlend)
+    // Miuix v0.9.4 official progressive blur: progressiveTextureBlur + ProgressiveBlur.Top.
+
+    val topBarBlurColors = BlurDefaults.blurColors(
+        blendColors = listOf(BlendColorEntry(surface.copy(alpha = 0.3f))),
+    )
 
     Scaffold(
         containerColor = surface,
         topBar = {
-            Box(
-                Modifier.then(
-                    if (shaderSupported && collapsed) Modifier.textureBlur(
-                        backdrop = pageBackdrop,
-                        shape = RectangleShape,
-                        blurRadius = 25f,
-                        colors = BlurDefaults.blurColors(
-                            blendColors = listOf(BlendColorEntry(surface.copy(alpha = 0.8f))),
-                        ),
-                    ) else Modifier,
+            // Keep the app bar itself transparent. The progressive blur is an overlay owned
+            // by the app bar, rather than a permanently blurred measured wrapper around it.
+            TopAppBar(
+                title = "关于",
+                largeTitle = "关于",
+                bottomContent = {
+                    Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .graphicsLayer {
+                                    alpha = (-topAppBarScrollBehavior.state.contentOffset /
+                                        with(density) { 48.dp.toPx() }).coerceIn(0f, 1f)
+                                }
+                                .progressiveTextureBlur(
+                                    backdrop = pageBackdrop,
+                                    shape = RectangleShape,
+                                    gradient = ProgressiveBlur.Top.copy(curve = 2.2f),
+                                    blurRadius = 10f,
+                                    colors = topBarBlurColors,
+                                ),
+                        )
+                },
+                scrollBehavior = topAppBarScrollBehavior,
+                titleColor = MiuixTheme.colorScheme.onSurface.copy(
+                    alpha = ((scrollProgress - 0.35f) / 0.65f).coerceIn(0f, 1f),
                 ),
-            ) {
-                SmallTopAppBar(
-                    title = "关于",
-                    titleColor = MiuixTheme.colorScheme.onSurface.copy(
-                        alpha = ((scrollProgress - 0.35f) / 0.65f).coerceIn(0f, 1f),
-                    ),
-                    color = if (collapsed && !shaderSupported) surface else Color.Transparent,
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(imageVector = MiuixIcons.Back, contentDescription = "返回")
-                        }
-                    },
-                )
-            }
+                color = Color.Transparent,
+                defaultWindowInsetsPadding = false,
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(imageVector = MiuixIcons.Back, contentDescription = "返回")
+                    }
+                },
+            )
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().layerBackdrop(pageBackdrop)) {
@@ -119,7 +134,7 @@ fun AboutPage(onBack: () -> Unit) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = padding.calculateTopPadding() + 92.dp, start = 20.dp, end = 20.dp)
+                        .padding(top = padding.calculateTopPadding() + 52.dp, start = 20.dp, end = 20.dp)
                         .onSizeChanged { with(density) { logoHeight = it.height.toDp() } },
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -162,12 +177,15 @@ fun AboutPage(onBack: () -> Unit) {
                 }
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize().overScrollVertical(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .overScrollVertical()
+                        .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
                     overscrollEffect = null,
                     contentPadding = PaddingValues(top = padding.calculateTopPadding()),
                 ) {
                     item(key = "logoSpacer") {
-                        Spacer(Modifier.fillMaxWidth().height(logoHeight + 92.dp + 126.dp))
+                        Spacer(Modifier.fillMaxWidth().height(logoHeight + 52.dp + 126.dp))
                     }
                     item(key = "aboutCards") {
                         Box {

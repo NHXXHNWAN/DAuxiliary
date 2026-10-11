@@ -1,77 +1,117 @@
 package com.dauxiliary.core.feature
 
-import android.content.Context
+import android.util.Log
 import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.core.registry.AppTarget
+import com.dauxiliary.core.xposed.HostActivityTracker
+import com.dauxiliary.core.xposed.HostEntryHook
+import com.dauxiliary.core.xposed.QQDexKitResolver
+import com.dauxiliary.core.xposed.QQPokeEffectHook
+import com.dauxiliary.core.xposed.QQRecallHook
+import com.dauxiliary.core.telegram.TelegramAutoSignHook
+import io.github.libxposed.api.XposedInterface
+import io.github.libxposed.api.XposedModuleInterface
 
-/** Central feature catalogue shared by all injected hosts. */
+/** Central feature catalogue and LibXposed API 102 dispatch point. */
 object FeatureRegistry {
     private val allFeatures = listOf(
         FeatureDefinition(
             id = "home.module_settings",
             title = "模块设置入口",
-            summary = "在宿主应用内显示轻量模块设置入口。",
+            summary = "通过宿主原生设置项进入模块自有设置页面。",
             category = FeatureCategory.HOME,
             hosts = AppTarget.entries.toSet(),
             implemented = true,
         ),
         FeatureDefinition(
-            id = "privacy.hide_online_status",
-            title = "隐私状态增强",
-            summary = "隐私状态增强。",
-            category = FeatureCategory.PRIVACY,
-            hosts = AppTarget.entries.toSet(),
-        ),
-        FeatureDefinition(
-            id = "beautify.clean_home",
-            title = "主页界面整理",
-            summary = "按宿主应用提供界面整理与入口优化。",
-            category = FeatureCategory.BEAUTIFY,
-            hosts = AppTarget.entries.toSet(),
-        ),
-        FeatureDefinition(
-            id = "debug.verbose_log",
-            title = "详细日志",
-            summary = "记录模块加载、宿主识别和功能状态变化。",
+            id = "telegram.host_support",
+            title = "Telegram 宿主支持",
+            summary = "识别 Telegram 官方版、官网版及已适配的第三方客户端。",
             category = FeatureCategory.DEBUG,
-            hosts = AppTarget.entries.toSet(),
+            hosts = setOf(AppTarget.TELEGRAM),
+            implemented = true,
         ),
         FeatureDefinition(
-            id = "wechat.chat_tools",
-            title = "微信聊天辅助",
-            summary = "微信聊天辅助。",
+            id = TelegramAutoSignHook.FEATURE_ID,
+            title = "Telegram 自动签到",
+            summary = "仅观察已学习的签到目标与回复；自动发送尚未启用，未知 fork 安全降级。",
             category = FeatureCategory.CHAT,
-            hosts = setOf(AppTarget.WECHAT),
+            hosts = setOf(AppTarget.TELEGRAM),
+            implemented = true,
         ),
         FeatureDefinition(
-            id = "douyin.content_tools",
-            title = "抖音内容辅助",
-            summary = "抖音内容辅助。",
-            category = FeatureCategory.HOME,
-            hosts = setOf(AppTarget.DOUYIN),
-        ),
-        FeatureDefinition(
-            id = "qq.chat_tools",
-            title = "QQ 聊天辅助",
-            summary = "QQ 聊天辅助。",
+            id = QQRecallHook.FEATURE_ID,
+            title = "QQ 防撤回",
+            summary = "拦截已识别的 QQNT 私聊与群聊撤回推送；其他消息保持 QQ 原始行为。",
             category = FeatureCategory.CHAT,
             hosts = setOf(AppTarget.QQ),
+            implemented = true,
+        ),
+        FeatureDefinition(
+            id = QQPokeEffectHook.FEATURE_ID,
+            title = "关闭戳一戳动画",
+            summary = "关闭已识别的 QQ 戳一戳效果；未匹配版本保持原始行为。",
+            category = FeatureCategory.CHAT,
+            hosts = setOf(AppTarget.QQ),
+            implemented = true,
         ),
     )
 
-    fun featuresFor(host: AppTarget): List<FeatureDefinition> =
-        allFeatures.filter { host in it.hosts }
+    fun featuresFor(host: AppTarget): List<FeatureDefinition> = allFeatures.filter { host in it.hosts }
 
     fun categoriesFor(host: AppTarget): List<FeatureCategory> =
         featuresFor(host).map { it.category }.distinct()
 
-    fun isEnabled(context: Context, host: AppTarget, feature: FeatureDefinition): Boolean =
-        ConfigStore.enabledFeatureIds(context, host).contains(feature.id)
+    /** Every registered feature is treated as permanently enabled. */
+    fun enabledCount(host: AppTarget): Int =
+        featuresFor(host).count { it.implemented }
 
-    fun enabledCount(context: Context, host: AppTarget): Int =
-        featuresFor(host).count { it.implemented && isEnabled(context, host, it) }
+    fun dispatch(
+        xposed: XposedInterface,
+        packageParam: XposedModuleInterface.PackageReadyParam,
+        host: AppTarget,
+    ) {
+        // Entry injection is independent from feature implementations and must not
+        // be blocked by one failed feature hook.
+        runHook("${host.name}.entry") { HostEntryHook.install(xposed, host, packageParam.classLoader) }
 
-    fun setEnabled(context: Context, host: AppTarget, feature: FeatureDefinition, enabled: Boolean) {
-        ConfigStore.setFeatureEnabled(context, host, feature.id, enabled)
+        if (host == AppTarget.TELEGRAM && telegramAuthorized() && enabled(host, TelegramAutoSignHook.FEATURE_ID)) {
+            runHook(TelegramAutoSignHook.FEATURE_ID) {
+                TelegramAutoSignHook.install(xposed, packageParam.classLoader, packageParam.packageName)
+            }
+        }
+
+        if (host == AppTarget.QQ && enabled(host, QQRecallHook.FEATURE_ID)) {
+            runHook(QQRecallHook.FEATURE_ID) { QQRecallHook.install(xposed, packageParam.classLoader) }
+        }
+        if (host == AppTarget.QQ && enabled(host, QQPokeEffectHook.FEATURE_ID)) {
+            runHook(QQPokeEffectHook.FEATURE_ID) { QQPokeEffectHook.install(xposed, packageParam.classLoader) }
+        }
+    }
+
+    private fun enabled(host: AppTarget, featureId: String): Boolean =
+        ConfigStore.isFeatureEnabledInHookedProcess(host, featureId)
+
+    private fun telegramAuthorized(): Boolean = runCatching {
+        val context = Class.forName("android.app.ActivityThread")
+            .getMethod("currentApplication").invoke(null) as? android.content.Context
+            ?: return false
+        ConfigStore.isTelegramAuthorized(context) ||
+            com.dauxiliary.core.telegram.TelegramPrefs(context).authorized()
+    }.getOrDefault(false)
+
+    private inline fun runHook(id: String, block: () -> Unit) {
+        runCatching { block() }.onFailure { error ->
+            Log.e("DAuxiliary", "Feature hook failed: $id", error)
+        }
+    }
+
+    fun resetForHotReload() {
+        HostEntryHook.resetForHotReload()
+        QQRecallHook.resetForHotReload()
+        QQPokeEffectHook.resetForHotReload()
+        QQDexKitResolver.resetForHotReload()
+        HostActivityTracker.resetForHotReload()
+        TelegramAutoSignHook.resetForHotReload()
     }
 }

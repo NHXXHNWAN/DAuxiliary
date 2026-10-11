@@ -12,6 +12,10 @@ android {
 
     defaultConfig {
         applicationId = "com.dauxiliary"
+        // XP102/FPA resolves java_init.list through the primary dex on some hosts.
+        multiDexEnabled = true
+        multiDexKeepFile = file("main-dex-list.txt")
+        multiDexKeepProguard = file("multidex-keep.pro")
         // miuix-blur-android 0.9.4-rc01 declares minSdk 33.
         minSdk = 33
         targetSdk = 37
@@ -52,13 +56,15 @@ android {
     buildTypes {
         release {
             if (hasReleaseSigning) signingConfig = signingConfigs.getByName("ciRelease")
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
         }
     }
+    // Match the JDK 21 toolchain and Miuix dependencies compiled for JVM 21.
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
@@ -91,6 +97,8 @@ if (System.getProperty("os.arch") in setOf("aarch64", "arm64")) {
 
 
 dependencies {
+    testImplementation(kotlin("test"))
+    testImplementation("junit:junit:4.13.2")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -103,8 +111,11 @@ dependencies {
     implementation(libs.miuix.icons)
     implementation(libs.miuix.nav)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.miuix.navigationevent)
-
-    // Xposed: compile-only, provided by LSPosed at runtime
+    implementation(libs.xposed.service)
+    implementation(libs.xposedInterface)
     compileOnly(libs.xposed.api)
+
+    // DexKit: bundled with the module and used for QQ obfuscated-class lookup.
+    implementation(libs.dexkit)
+
 }
