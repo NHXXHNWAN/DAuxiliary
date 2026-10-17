@@ -1,17 +1,18 @@
 package com.dauxiliary.admin
+
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -33,13 +34,14 @@ import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.basic.FloatingNavigationBar
+import top.yukonga.miuix.kmp.basic.FloatingNavigationBarItem
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.NavigationItem
-import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.basic.Check
 import top.yukonga.miuix.kmp.icon.extended.Home
 import top.yukonga.miuix.kmp.icon.extended.Layers
 import top.yukonga.miuix.kmp.icon.extended.Settings
@@ -88,25 +90,20 @@ internal fun ConnectionScreen(
                 .overScrollVertical()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
             contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = padding.calculateTopPadding() + 4.dp,
-                bottom = padding.calculateBottomPadding() + 24.dp,
+                start = 20.dp,
+                end = 20.dp,
+                top = padding.calculateTopPadding() + 12.dp,
+                bottom = padding.calculateBottomPadding() + 20.dp,
             ),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item {
-                Column(
-                    Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text(if (isEditing) "编辑连接" else "配置连接", style = MiuixTheme.textStyles.title1)
-                    Text(
-                        "管理 Worker 使用 HTTPS 连接，凭据仅保存在本机。",
-                        style = MiuixTheme.textStyles.footnote1,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    )
-                }
+                Text(
+                    "管理 Worker 使用 HTTPS 连接，凭据仅保存在本机。",
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
             }
             item {
                 SmallTitle(text = "连接信息")
@@ -168,29 +165,31 @@ internal fun ConnectionScreen(
                 }
             }
             if (savedAccounts.isNotEmpty()) {
-                item { SmallTitle(text = "已保存") }
-                items(savedAccounts, key = { it.name }) { account ->
-                    val isActive = account.name == activeAccountName
+                item { SmallTitle(text = "已保存连接") }
+                item {
                     Card(Modifier.fillMaxWidth()) {
                         Column {
-                            BasicComponent(
-                                title = account.name + if (isActive) " · 当前" else "",
-                                summary = account.endpoint,
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                                horizontalArrangement = Arrangement.End,
-                            ) {
-                                if (!isActive) {
+                            savedAccounts.forEach { account ->
+                                val isActive = account.name == activeAccountName
+                                BasicComponent(
+                                    title = account.name + if (isActive) " · 当前" else "",
+                                    summary = account.endpoint,
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                                    horizontalArrangement = Arrangement.End,
+                                ) {
+                                    if (!isActive) {
+                                        TextButton(
+                                            text = "切换",
+                                            onClick = { onSwitch(account) },
+                                        )
+                                    }
                                     TextButton(
-                                        text = "切换",
-                                        onClick = { onSwitch(account) },
+                                        text = "移除",
+                                        onClick = { deleteCandidate = account },
                                     )
                                 }
-                                TextButton(
-                                    text = "移除",
-                                    onClick = { deleteCandidate = account },
-                                )
                             }
                         }
                     }
@@ -239,71 +238,66 @@ internal fun AdminDashboard(
     onConfirmRevoke: () -> Unit,
 ) {
     var userFilter by rememberSaveable { mutableStateOf("") }
-    var selectedTab by rememberSaveable { mutableStateOf(0) }
     var pendingRoleAction by remember { mutableStateOf<String?>(null) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val scrollBehavior = MiuixScrollBehavior()
     val users = summary?.optJSONArray("users")?.let { array ->
         (0 until array.length()).mapNotNull { array.optJSONObject(it) }
     }
-    val pageTitles = listOf("管理概览", "用户", "Bot 角色", "模块授权")
+    val pageTitles = listOf("管理概览", "用户授权", "Bot 角色")
+    val currentTab = selectedTab.coerceIn(0, 2)
     val navigationItems = remember {
         listOf(
             NavigationItem("总览", MiuixIcons.Home),
-            NavigationItem("用户", MiuixIcons.Layers),
-            NavigationItem("Bot 角色", MiuixIcons.Basic.Check),
-            NavigationItem("模块授权", MiuixIcons.Settings),
+            NavigationItem("用户授权", MiuixIcons.Layers),
+            NavigationItem("Bot 角色", MiuixIcons.Settings),
         )
     }
-    val contentBackdrop = rememberLayerBackdrop()
+    val surfaceColor = MiuixTheme.colorScheme.surface
+    val contentBackdrop = rememberLayerBackdrop {
+        drawRect(surfaceColor)
+        drawContent()
+    }
     Scaffold(
         topBar = {
             TopAppBar(
-                title = pageTitles[selectedTab],
-                largeTitle = pageTitles[selectedTab],
+                title = pageTitles[currentTab],
+                largeTitle = pageTitles[currentTab],
                 scrollBehavior = scrollBehavior,
             )
         },
         bottomBar = {
-            AdminLiquidNavigationBar(
-                items = navigationItems,
-                selectedIndex = selectedTab,
-                onItemClick = { selectedTab = it },
-                backdrop = contentBackdrop,
-            )
+            FloatingNavigationBar(defaultWindowInsetsPadding = false) {
+                navigationItems.forEachIndexed { index, item ->
+                    FloatingNavigationBarItem(
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index },
+                        icon = item.icon,
+                        label = item.label,
+                    )
+                }
+            }
         },
     ) { padding ->
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .layerBackdrop(contentBackdrop)
-                .overScrollVertical()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = padding.calculateTopPadding() + 12.dp,
-                bottom = padding.calculateBottomPadding() + 16.dp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(padding)
+                .layerBackdrop(contentBackdrop),
         ) {
-            item {
-                    Column(
-                        Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Text(pageTitles[selectedTab], style = MiuixTheme.textStyles.title1)
-                        Text(
-                            text = when (selectedTab) {
-                                0 -> active?.name ?: "管理工作台"
-                                1 -> "${users?.size ?: 0} 位已授权用户"
-                                2 -> "维护者与 Bot 管理员"
-                                else -> "DAuxiliary 模块访问权限"
-                            },
-                            style = MiuixTheme.textStyles.footnote1,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        )
-                    }
-                }
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .overScrollVertical()
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+                contentPadding = PaddingValues(
+                    start = 20.dp,
+                    end = 20.dp,
+                    top = 12.dp,
+                    bottom = 16.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 if (message.isNotBlank()) {
                     item {
                         Card(Modifier.fillMaxWidth()) {
@@ -312,10 +306,10 @@ internal fun AdminDashboard(
                     }
                 }
 
-                when (selectedTab) {
+                when (currentTab) {
                     0 -> {
                         item {
-                            SmallTitle(text = "工作连接")
+                            SmallTitle(text = "当前连接")
                             Card(Modifier.fillMaxWidth()) {
                                 Column {
                                     val connectionState = when {
@@ -325,11 +319,11 @@ internal fun AdminDashboard(
                                         else -> "尚未配置"
                                     }
                                     BasicComponent(
-                                        title = active?.name ?: "配置管理连接",
-                                        summary = "$connectionState · ${active?.endpoint?.substringAfter("://")?.substringBefore('/') ?: "未设置 Worker"}",
+                                        title = active?.name ?: "尚未配置管理连接",
+                                        summary = "$connectionState · ${active?.endpoint?.substringAfter("://")?.substringBefore('/') ?: "添加 Worker 地址以开始管理"}",
                                     )
                                     Row(
-                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
                                         Button(
@@ -338,32 +332,14 @@ internal fun AdminDashboard(
                                             modifier = Modifier.weight(1f),
                                             colors = ButtonDefaults.buttonColorsPrimary(),
                                         ) { Text(if (busy) "同步中" else "刷新数据") }
-                                        Button(
+                                        TextButton(
+                                            text = "连接设置",
                                             onClick = onEdit,
                                             enabled = !busy,
                                             modifier = Modifier.weight(1f),
-                                        ) { Text("连接管理") }
-                                    }
-                                }
-                            }
-                            if (accounts.size > 1) {
-                                SmallTitle(text = "其他连接")
-                                accounts.filter { it.name != active?.name }.forEach { account ->
-                                    Card(Modifier.fillMaxWidth()) {
-                                        ArrowPreference(
-                                            title = account.name,
-                                            summary = account.endpoint,
-                                            onClick = { if (!busy) onSwitch(account) },
                                         )
                                     }
                                 }
-                            }
-                            Card(Modifier.fillMaxWidth()) {
-                                ArrowPreference(
-                                    title = "添加连接",
-                                    summary = "添加另一个 Worker",
-                                    onClick = onAdd,
-                                )
                             }
                         }
                         item {
@@ -371,50 +347,58 @@ internal fun AdminDashboard(
                             if (summary == null) {
                                 Card(Modifier.fillMaxWidth()) {
                                     BasicComponent(
-                                        title = if (busy) "正在加载" else "暂无数据",
-                                        summary = if (active == null) "先配置管理连接" else "下拉刷新或点按上方刷新数据",
+                                        title = if (busy) "正在加载授权数据" else "还没有授权数据",
+                                        summary = if (active == null) "先配置管理连接" else "点击上方刷新数据以获取最新统计",
                                     )
                                 }
                             } else {
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        MetricCard(
-                                            "模块授权",
-                                            summary.optString("module_authorized_count", "0"),
-                                            Modifier.weight(1f),
-                                        )
-                                        MetricCard(
-                                            "有效授权码",
-                                            summary.optString("active_code_count", "0"),
-                                            Modifier.weight(1f),
-                                        )
-                                    }
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        MetricCard(
-                                            "Bot 管理员",
-                                            summary.optString("bot_admin_count", "0"),
-                                            Modifier.weight(1f),
-                                        )
-                                        MetricCard(
-                                            "维护者",
-                                            summary.optString("maintainer_count", "0"),
-                                            Modifier.weight(1f),
-                                        )
-                                    }
-                                    Card(Modifier.fillMaxWidth()) {
+                                Card(Modifier.fillMaxWidth()) {
+                                    Column(Modifier.padding(vertical = 4.dp)) {
+                                        Column(
+                                            Modifier.fillMaxWidth().padding(12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                                        ) {
+                                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                MetricCard("模块授权", summary.optString("module_authorized_count", "0"), Modifier.weight(1f))
+                                                MetricCard("有效授权码", summary.optString("active_code_count", "0"), Modifier.weight(1f))
+                                            }
+                                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                MetricCard("Bot 管理员", summary.optString("bot_admin_count", "0"), Modifier.weight(1f))
+                                                MetricCard("维护者", summary.optString("maintainer_count", "0"), Modifier.weight(1f))
+                                            }
+                                        }
                                         BasicComponent(
                                             title = "授权码统计",
                                             summary = "已发 ${summary.optString("issued_count", "0")}  ·  已兑换 ${summary.optString("redeemed_count", "0")}  ·  已撤销 ${summary.optString("revoked_count", "0")}",
                                         )
                                     }
-                                    summary.optString("generated_at").takeIf { it.isNotBlank() }?.let { generatedAt ->
-                                        Text(
-                                            text = "更新于 ${formatTimestamp(generatedAt)}",
-                                            style = MiuixTheme.textStyles.footnote1,
-                                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                            modifier = Modifier.padding(horizontal = 4.dp),
+                                }
+                                summary.optString("generated_at").takeIf { it.isNotBlank() }?.let { generatedAt ->
+                                    Text(
+                                        text = "更新于 ${formatTimestamp(generatedAt)}",
+                                        style = MiuixTheme.textStyles.footnote1,
+                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                        modifier = Modifier.padding(horizontal = 4.dp),
+                                    )
+                                }
+                            }
+                        }
+                        item {
+                            SmallTitle(text = "连接列表")
+                            Card(Modifier.fillMaxWidth()) {
+                                Column {
+                                    accounts.filter { it.name != active?.name }.forEach { account ->
+                                        ArrowPreference(
+                                            title = account.name,
+                                            summary = account.endpoint,
+                                            onClick = { if (!busy) onSwitch(account) },
                                         )
                                     }
+                                    ArrowPreference(
+                                        title = "添加连接",
+                                        summary = "添加另一个 Worker",
+                                        onClick = onAdd,
+                                    )
                                 }
                             }
                         }
@@ -455,62 +439,56 @@ internal fun AdminDashboard(
                                     }
                                 }
                             } else {
-                                items(matchingUsers, key = { it.optString("telegram_id") }) { user ->
-                                    val id = user.optString("telegram_id")
-                                    val selected = id == revokeTargetId
-                                    val method = user.optString("method").takeIf { it.isNotBlank() && it != "unknown" }
-                                    val detail = buildString {
-                                        append("授权于 ${formatTimestamp(user.optString("granted_at"))}")
-                                        method?.let { append(" · $it") }
-                                    }
+                                item {
                                     Card(Modifier.fillMaxWidth()) {
                                         Column {
-                                            BasicComponent(
-                                                title = "Telegram ID  $id${if (selected) " · 模块操作对象" else ""}",
-                                                summary = detail,
-                                            )
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-                                                horizontalArrangement = Arrangement.End,
-                                            ) {
-                                                TextButton(
-                                                    text = "Bot 角色",
-                                                    onClick = {
-                                                        onUserSelect(id)
-                                                        selectedTab = 2
-                                                    },
+                                            matchingUsers.forEach { user ->
+                                                val id = user.optString("telegram_id")
+                                                val selected = id == revokeTargetId
+                                                val method = user.optString("method").takeIf { it.isNotBlank() && it != "unknown" }
+                                                val detail = buildString {
+                                                    append("授权于 ${formatTimestamp(user.optString("granted_at"))}")
+                                                    method?.let { append(" · $it") }
+                                                }
+                                                BasicComponent(
+                                                    title = "Telegram ID  $id${if (selected) " · 模块操作对象" else ""}",
+                                                    summary = detail,
                                                 )
-                                                TextButton(
-                                                    text = "模块授权",
-                                                    onClick = {
-                                                        onRevokeTargetIdChange(id)
-                                                        selectedTab = 3
-                                                    },
-                                                )
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                                                    horizontalArrangement = Arrangement.End,
+                                                ) {
+                                                    TextButton(
+                                                        text = "Bot 角色",
+                                                        enabled = !busy,
+                                                        onClick = {
+                                                            onUserSelect(id)
+                                                            selectedTab = 2
+                                                        },
+                                                    )
+                                                    TextButton(
+                                                        text = "撤销授权",
+                                                        enabled = !busy,
+                                                        onClick = {
+                                                            onRevokeTargetIdChange(id)
+                                                            onAskRevoke()
+                                                        },
+                                                    )
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
-                            summary.optString("generated_at").takeIf { it.isNotBlank() }?.let { generatedAt ->
-                                item {
-                                    Text(
-                                        text = "数据更新于 ${formatTimestamp(generatedAt)}",
-                                        style = MiuixTheme.textStyles.footnote1,
-                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                        modifier = Modifier.padding(horizontal = 4.dp),
-                                    )
-                                }
-                            }
                         }
-                        if (roleTargetId.isNotBlank() || revokeTargetId.isNotBlank()) {
+                        summary?.optString("generated_at")?.takeIf { it.isNotBlank() }?.let { generatedAt ->
                             item {
-                                Card(Modifier.fillMaxWidth()) {
-                                    BasicComponent(
-                                        title = "当前操作对象",
-                                        summary = "Bot 角色：${roleTargetId.ifBlank { "未选择" }} · 模块授权：${revokeTargetId.ifBlank { "未选择" }}",
-                                    )
-                                }
+                                Text(
+                                    text = "数据更新于 ${formatTimestamp(generatedAt)}",
+                                    style = MiuixTheme.textStyles.footnote1,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                    modifier = Modifier.padding(horizontal = 4.dp),
+                                )
                             }
                         }
                     }
@@ -581,43 +559,9 @@ internal fun AdminDashboard(
                         }
                     }
 
-                    else -> {
-                        item {
-                            SmallTitle(text = "模块授权")
-                            Card(Modifier.fillMaxWidth()) {
-                                Column(
-                                    Modifier.padding(16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                                ) {
-                                    TextField(
-                                        value = revokeTargetId,
-                                        onValueChange = { onRevokeTargetIdChange(it.filter(Char::isDigit)) },
-                                        label = "Telegram 用户 ID",
-                                        singleLine = true,
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    )
-                                    Text(
-                                        text = "撤销后该用户的模块凭据失效，未兑换授权码将被清除。Bot 角色不会改变。",
-                                        style = MiuixTheme.textStyles.body2,
-                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                    )
-                                    Button(
-                                        onClick = onAskRevoke,
-                                        enabled = !busy && revokeTargetId.isNotBlank() && !revokeConfirmation,
-                                        modifier = Modifier.fillMaxWidth(),
-                                    ) { Text(if (busy) "处理中" else "撤销模块授权") }
-                                }
-                            }
-                            Text(
-                                text = "此操作不可撤销，提交前请核对用户 ID。",
-                                style = MiuixTheme.textStyles.footnote1,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                modifier = Modifier.padding(horizontal = 4.dp),
-                            )
-                        }
-                    }
                 }
             }
+        }
     }
 
     if (revokeConfirmation) {
@@ -760,11 +704,22 @@ private fun ConfirmDialog(
 
 @Composable
 private fun MetricCard(label: String, value: String, modifier: Modifier = Modifier) {
-    Card(modifier.fillMaxWidth()) {
-        BasicComponent(
-            title = label,
-            summary = value,
+    Card(modifier) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+        Text(
+            text = value,
+            style = MiuixTheme.textStyles.title1,
+            color = MiuixTheme.colorScheme.onSurface,
         )
+        Text(
+            text = label,
+            style = MiuixTheme.textStyles.footnote1,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+        )
+        }
     }
 }
 private fun formatTimestamp(value: String): String = when {

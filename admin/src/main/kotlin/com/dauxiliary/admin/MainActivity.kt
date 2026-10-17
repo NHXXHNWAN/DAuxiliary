@@ -15,6 +15,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
+import top.yukonga.miuix.kmp.nav.core.NavDisplay
+import top.yukonga.miuix.kmp.nav.core.rememberNavBackStack
+import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
+import top.yukonga.miuix.kmp.nav.transition.NavTransitions
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -268,98 +272,120 @@ private fun AdminApp() {
         if (active != null && !showConfig && summary == null && !connected && !busy) refresh()
     }
 
-    if (showConfig) {
-        ConnectionScreen(
-            isEditing = active != null,
-            canCancel = active != null,
-            accountName = accountName,
-            endpoint = endpoint,
-            token = token,
-            tokenRevealed = tokenRevealed,
-            saving = saving,
-            message = message,
-            savedAccounts = accounts,
-            activeAccountName = active?.name,
-            onAccountNameChange = { accountName = it },
-            onEndpointChange = { endpoint = it },
-            onTokenChange = { token = it },
-            onToggleTokenVisibility = { tokenRevealed = !tokenRevealed },
-            onCancel = {
-                tokenRevealed = false
-                if (active != null) {
+    val backStack = rememberNavBackStack<AdminRoute>(AdminRoute.Dashboard)
+    LaunchedEffect(showConfig) {
+        val onConnection = backStack.lastOrNull() == AdminRoute.Connection
+        if (showConfig && !onConnection) {
+            backStack.add(AdminRoute.Connection)
+        } else if (!showConfig && onConnection) {
+            backStack.removeLastOrNull()
+        }
+    }
+
+    NavDisplay(
+        backStack = backStack,
+        transition = NavTransitions.MiuixDefault,
+        onBack = {
+            showConfig = false
+            backStack.removeLastOrNull()
+        },
+    ) {
+        entry<AdminRoute.Dashboard> {
+            AdminDashboard(
+                active = active,
+                accounts = accounts,
+                summary = summary,
+                roles = roles,
+                connected = connected,
+                busy = busy,
+                message = message,
+                roleTargetId = roleTargetId,
+                revokeTargetId = revokeTargetId,
+                revokeConfirmation = revokeConfirmation,
+                onRoleTargetIdChange = { roleTargetId = it.filter(Char::isDigit) },
+                onRevokeTargetIdChange = { revokeTargetId = it.filter(Char::isDigit) },
+                onUserSelect = { id ->
+                    roleTargetId = id
+                    revokeTargetId = id
+                    message = "已选择 Telegram ID $id；可在此管理 Bot 角色或模块授权"
+                },
+                onEdit = {
                     accountName = active?.name.orEmpty()
                     endpoint = active?.endpoint.orEmpty()
                     token = active?.token.orEmpty()
-                    showConfig = false
-                }
-            },
-            onSave = ::verifyAndSave,
-            onSwitch = ::switchAccount,
-            onDeleteAccount = ::deleteAccount,
-        )
-    } else {
-        AdminDashboard(
-            active = active,
-            accounts = accounts,
-            summary = summary,
-            roles = roles,
-            connected = connected,
-            busy = busy,
-            message = message,
-            roleTargetId = roleTargetId,
-            revokeTargetId = revokeTargetId,
-            revokeConfirmation = revokeConfirmation,
-            onRoleTargetIdChange = { roleTargetId = it.filter(Char::isDigit) },
-            onRevokeTargetIdChange = { revokeTargetId = it.filter(Char::isDigit) },
-            onUserSelect = { id ->
-                roleTargetId = id
-                message = "已选择 Telegram ID $id，用于 Bot 角色操作"
-            },
-            onEdit = {
-                accountName = active?.name.orEmpty()
-                endpoint = active?.endpoint.orEmpty()
-                token = active?.token.orEmpty()
-                tokenRevealed = false
-                message = ""
-                showConfig = true
-            },
-            onAdd = {
-                accountName = ""
-                endpoint = ""
-                token = ""
-                tokenRevealed = false
-                message = ""
-                showConfig = true
-            },
-            onSwitch = ::switchAccount,
-            onRefresh = ::refresh,
-            onRoleChange = { role, grant ->
-                val id = roleTargetId
-                if (id.isBlank() || !id.all(Char::isDigit)) {
-                    message = "请输入有效的 Telegram 数字 ID"
-                } else {
+                    tokenRevealed = false
+                    message = ""
+                    showConfig = true
+                },
+                onAdd = {
+                    accountName = ""
+                    endpoint = ""
+                    token = ""
+                    tokenRevealed = false
+                    message = ""
+                    showConfig = true
+                },
+                onSwitch = ::switchAccount,
+                onRefresh = ::refresh,
+                onRoleChange = { role, grant ->
+                    val id = roleTargetId
+                    if (id.isBlank() || !id.all(Char::isDigit)) {
+                        message = "请输入有效的 Telegram 数字 ID"
+                    } else {
+                        perform(
+                            if (grant) "/admin/bot/role/grant" else "/admin/bot/role/revoke",
+                            JSONObject().put("telegram_id", id).put("role", role),
+                            if (grant) "角色已授予，并已刷新角色列表" else "角色已撤销，并已刷新角色列表",
+                        )
+                    }
+                },
+                onAskRevoke = {
+                    if (revokeTargetId.isBlank() || !revokeTargetId.all(Char::isDigit)) {
+                        message = "请输入有效的 Telegram 数字 ID"
+                    } else {
+                        revokeConfirmation = true
+                    }
+                },
+                onCancelRevoke = { revokeConfirmation = false },
+                onConfirmRevoke = {
                     perform(
-                        if (grant) "/admin/bot/role/grant" else "/admin/bot/role/revoke",
-                        JSONObject().put("telegram_id", id).put("role", role),
-                        if (grant) "角色已授予，并已刷新角色列表" else "角色已撤销，并已刷新角色列表",
+                        "/admin/revoke",
+                        JSONObject().put("telegram_id", revokeTargetId),
+                        "用户模块授权已撤销",
                     )
-                }
-            },
-            onAskRevoke = {
-                if (revokeTargetId.isBlank() || !revokeTargetId.all(Char::isDigit)) {
-                    message = "请输入有效的 Telegram 数字 ID"
-                } else {
-                    revokeConfirmation = true
-                }
-            },
-            onCancelRevoke = { revokeConfirmation = false },
-            onConfirmRevoke = {
-                perform(
-                    "/admin/revoke",
-                    JSONObject().put("telegram_id", revokeTargetId),
-                    "用户模块授权已撤销",
-                )
-            },
-        )
+                },
+            )
+        }
+        entry<AdminRoute.Connection>(swipeDismiss = NavSwipeDirection.LeftToRight) {
+            ConnectionScreen(
+                isEditing = active != null,
+                canCancel = active != null,
+                accountName = accountName,
+                endpoint = endpoint,
+                token = token,
+                tokenRevealed = tokenRevealed,
+                saving = saving,
+                message = message,
+                savedAccounts = accounts,
+                activeAccountName = active?.name,
+                onAccountNameChange = { accountName = it },
+                onEndpointChange = { endpoint = it },
+                onTokenChange = { token = it },
+                onToggleTokenVisibility = { tokenRevealed = !tokenRevealed },
+                onCancel = {
+                    tokenRevealed = false
+                    val currentActive = active
+                    if (currentActive != null) {
+                        accountName = currentActive.name
+                        endpoint = currentActive.endpoint
+                        token = currentActive.token
+                    }
+                    showConfig = false
+                },
+                onSave = ::verifyAndSave,
+                onSwitch = ::switchAccount,
+                onDeleteAccount = ::deleteAccount,
+            )
+        }
     }
 }
