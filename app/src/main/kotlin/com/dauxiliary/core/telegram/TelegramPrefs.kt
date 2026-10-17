@@ -7,6 +7,8 @@ import java.util.Locale
 
 /** Telegram-only state namespace; it never reads QQ/WeChat preferences. */
 class TelegramPrefs(context: Context) {
+    data class LearnedButton(val text: String, val data: ByteArray, val messageId: Int)
+
     private val prefs = context.createDeviceProtectedStorageContext()
         .getSharedPreferences("telegram_autosign", Context.MODE_PRIVATE)
     fun enabled(): Boolean = prefs.getBoolean("enabled", true)
@@ -37,46 +39,97 @@ class TelegramPrefs(context: Context) {
 
     fun targets(account: String = DEFAULT_ACCOUNT): Set<String> =
         prefs.getStringSet("targets_${sanitize(account)}", emptySet()).orEmpty()
-    fun addTarget(id: String, account: String = DEFAULT_ACCOUNT) = prefs.edit()
-        .putStringSet("targets_${sanitize(account)}", targets(account) + id).apply()
-    fun removeTarget(id: String, account: String = DEFAULT_ACCOUNT) = prefs.edit()
-        .putStringSet("targets_${sanitize(account)}", targets(account) - id).apply()
+    @Synchronized
+    fun addTarget(id: String, account: String = DEFAULT_ACCOUNT) {
+        val value = id.trim().takeIf(String::isNotEmpty) ?: return
+        prefs.edit().putStringSet("targets_${sanitize(account)}", targets(account) + value).commit()
+    }
+
+    @Synchronized
+    fun removeTarget(id: String, account: String = DEFAULT_ACCOUNT) {
+        prefs.edit().putStringSet("targets_${sanitize(account)}", targets(account) - id).commit()
+        listOf("button_text", "button_data", "button_message", "last", "pending", "inflight", "inflight_at", "retry", "retry_at").forEach { name ->
+            prefs.edit().remove(key(account, name, id)).commit()
+        }
+    }
 
     fun signedToday(id: String, account: String = DEFAULT_ACCOUNT): Boolean =
         prefs.getString(key(account, "last", id), "") == today()
     fun markSigned(id: String, account: String = DEFAULT_ACCOUNT) = prefs.edit()
         .putString(key(account, "last", id), today())
         .remove(key(account, "pending", id))
-        .remove(key(account, "inflight", id)).apply()
-    fun markPending(id: String, account: String = DEFAULT_ACCOUNT) =
-        prefs.edit().putString(key(account, "pending", id), today()).apply()
+        .remove(key(account, "inflight", id))
+        .remove(key(account, "inflight_at", id))
+        .remove(key(account, "retry", id))
+        .remove(key(account, "retry_at", id))
+        .commit()
+    fun markPending(id: String, account: String = DEFAULT_ACCOUNT) = prefs.edit()
+        .putString(key(account, "pending", id), today())
+        .remove(key(account, "inflight", id))
+        .remove(key(account, "inflight_at", id))
+        .remove(key(account, "retry", id))
+        .remove(key(account, "retry_at", id))
+        .commit()
     fun pendingToday(id: String, account: String = DEFAULT_ACCOUNT): Boolean =
         prefs.getString(key(account, "pending", id), "") == today()
-    fun inFlight(id: String, account: String = DEFAULT_ACCOUNT): Boolean =
-        prefs.getString(key(account, "inflight", id), "") == today()
-    fun markInFlight(id: String, account: String = DEFAULT_ACCOUNT) =
-        prefs.edit().putString(key(account, "inflight", id), today()).apply()
+    fun inFlight(id: String, account: String = DEFAULT_ACCOUNT): Boolean {
+        if (prefs.getString(key(account, "inflight", id), "") != today()) return false
+        val sentAt = prefs.getLong(key(account, "inflight_at", id), 0L)
+        if (sentAt > 0L && System.currentTimeMillis() - sentAt < IN_FLIGHT_TTL_MS) return true
+        clearInFlight(id, account)
+        return false
+    }
+    @Synchronized
+    fun markInFlight(id: String, account: String = DEFAULT_ACCOUNT): Boolean {
+        if (inFlight(id, account) || signedToday(id, account) || pendingToday(id, account)) return false
+        return prefs.edit()
+            .putString(key(account, "inflight", id), today())
+            .putLong(key(account, "inflight_at", id), System.currentTimeMillis())
+            .commit()
+    }
     fun clearInFlight(id: String, account: String = DEFAULT_ACCOUNT) =
-        prefs.edit().remove(key(account, "inflight", id)).apply()
+        prefs.edit().remove(key(account, "inflight", id)).remove(key(account, "inflight_at", id)).commit()
 
     fun retryAt(id: String, account: String = DEFAULT_ACCOUNT): Long =
         prefs.getLong(key(account, "retry_at", id), 0L)
+    fun setRetryAt(id: String, atMillis: Long, account: String = DEFAULT_ACCOUNT): Boolean = prefs.edit()
+        .putInt(key(account, "retry", id), retryCount(id, account) + 1)
+        .putLong(key(account, "retry_at", id), atMillis)
+        .remove(key(account, "pending", id))
+        .remove(key(account, "inflight", id))
+        .remove(key(account, "inflight_at", id))
+        .commit()
     fun setRetry(id: String, count: Int, account: String = DEFAULT_ACCOUNT) = prefs.edit()
         .putInt(key(account, "retry", id), count)
         .putLong(key(account, "retry_at", id), System.currentTimeMillis() + SignLogic.backoffDelay(count))
-        .apply()
+        .remove(key(account, "pending", id))
+        .remove(key(account, "inflight", id))
+        .remove(key(account, "inflight_at", id))
+        .commit()
     fun retryCount(id: String, account: String = DEFAULT_ACCOUNT): Int =
         prefs.getInt(key(account, "retry", id), 0)
     fun clearRetry(id: String, account: String = DEFAULT_ACCOUNT) = prefs.edit()
-        .remove(key(account, "retry", id)).remove(key(account, "retry_at", id)).apply()
+        .remove(key(account, "retry", id)).remove(key(account, "retry_at", id)).commit()
 
-    fun learnedButton(account: String, id: String): String? =
-        prefs.getString(key(account, "button", id), null)
-    fun saveLearnedButton(account: String, id: String, text: String, data: String) =
-        prefs.edit().putString(key(account, "button", id), "$text|$data").apply()
+    fun learnedButton(account: String, id: String): LearnedButton? {
+        val text = prefs.getString(key(account, "button_text", id), null) ?: return null
+        val encoded = prefs.getString(key(account, "button_data", id), null) ?: return null
+        val data = runCatching { android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP) }.getOrNull() ?: return null
+        val messageId = prefs.getInt(key(account, "button_message", id), 0)
+        return LearnedButton(text, data, messageId).takeIf { messageId > 0 && data.isNotEmpty() }
+    }
+
+    fun saveLearnedButton(account: String, id: String, text: String, data: ByteArray, messageId: Int) = prefs.edit()
+        .putString(key(account, "button_text", id), text)
+        .putString(key(account, "button_data", id), android.util.Base64.encodeToString(data, android.util.Base64.NO_WRAP))
+        .putInt(key(account, "button_message", id), messageId)
+        .commit()
 
     fun today(): String = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
 
     private fun sanitize(value: String): String = value.replace(Regex("[^A-Za-z0-9_-]"), "_").take(80)
-    companion object { const val DEFAULT_ACCOUNT = "default" }
+    companion object {
+        const val DEFAULT_ACCOUNT = "default"
+        const val IN_FLIGHT_TTL_MS = 3 * 60_000L
+    }
 }

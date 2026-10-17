@@ -60,10 +60,9 @@ internal object TelegramSettingsEntryHook {
         var count = 0
         modernSettingsClasses.forEach { name ->
             val type = runCatching { classLoader.loadClass(name) }.getOrNull() ?: return@forEach
-            // The native SettingCell path is too dependent on Telegram/NagramXF's
-            // obfuscated resource and click model. Use the self-contained fallback
-            // so the row remains clickable across client variants.
-            count += installViewFallbackPath(xposed, classLoader, type, "telegram.settings")
+            val nativeCount = installModernSettingsPath(xposed, classLoader, type)
+            count += if (nativeCount > 0) nativeCount
+                else installViewFallbackPath(xposed, classLoader, type, "telegram.settings")
         }
         // Keep the legacy ProfileActivity path available for older Telegram forks.
         legacyProfileClasses.forEach { name ->
@@ -208,8 +207,8 @@ internal object TelegramSettingsEntryHook {
         // cannot expose the synthetic id reliably.
         if (mutable.any { readItemId(it, idReader) == SETTINGS_ENTRY_ID ||
                 it?.toString()?.contains(TITLE, ignoreCase = true) == true }) return
-        val index = mutable.indexOfFirst { readItemId(it, idReader) == SETTINGS_LANGUAGE_ITEM_ID }
-        if (index < 0) {
+        val languageIndex = mutable.indexOfFirst { readItemId(it, idReader) == SETTINGS_LANGUAGE_ITEM_ID }
+        if (languageIndex < 0) {
             synchronized(injectedLists) { injectedLists.remove(mutable) }
             android.util.Log.w(TAG, "Telegram language setting row not found; native insertion skipped")
             return
@@ -230,7 +229,7 @@ internal object TelegramSettingsEntryHook {
             android.util.Log.w(TAG, "Unable to create Telegram SettingCell", it)
             return
         }
-        runCatching { mutable.add(index, item) }
+        runCatching { mutable.add(languageIndex + 1, item) }
             .onSuccess { android.util.Log.i(TAG, "native Telegram settings item inserted") }
             .onFailure {
                 synchronized(injectedLists) { injectedLists.remove(mutable) }
@@ -410,26 +409,47 @@ internal object TelegramSettingsEntryHook {
             background = selectableBackground(activity)
             setOnClickListener { TelegramInProcessSettings.open(activity, loader) }
         }
-        val container = findSettingsContainer(root)
-        if (container != null) return runCatching {
-            container.addView(entry, ViewGroup.LayoutParams.MATCH_PARENT, dp(activity, 56)); true
-        }.getOrDefault(false)
+        val insertionPoint = findLanguageInsertionPoint(root)
+        if (insertionPoint == null) {
+            android.util.Log.w(TAG, "Language setting row not found; skipping fallback instead of placing the entry arbitrarily")
+            return false
+        }
+        val (container, index) = insertionPoint
         return runCatching {
-            val overlay = FrameLayout(activity).apply {
-                tag = OVERLAY_TAG
-                addView(entry, FrameLayout.LayoutParams.MATCH_PARENT, dp(activity, 56))
-            }
-            decor.addView(overlay, FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, dp(activity, 56), Gravity.BOTTOM))
+            container.addView(
+                entry,
+                index.coerceIn(0, container.childCount),
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(activity, 56)),
+            )
             true
-        }.getOrDefault(false)
+        }.onFailure { android.util.Log.w(TAG, "Unable to insert entry after the language setting row", it) }
+            .getOrDefault(false)
     }
 
-    private fun findSettingsContainer(root: View): ViewGroup? {
-        if (root is LinearLayout && root.orientation == LinearLayout.VERTICAL && root.childCount > 0) return root
+    private fun findLanguageInsertionPoint(root: View): Pair<ViewGroup, Int>? {
         val group = root as? ViewGroup ?: return null
-        for (i in 0 until group.childCount) findSettingsContainer(group.getChildAt(i))?.let { return it }
+        if (group is LinearLayout && group.orientation == LinearLayout.VERTICAL) {
+            for (index in 0 until group.childCount) {
+                if (containsLanguageLabel(group.getChildAt(index))) return group to (index + 1)
+            }
+        }
+        for (index in 0 until group.childCount) {
+            findLanguageInsertionPoint(group.getChildAt(index))?.let { return it }
+        }
         return null
+    }
+
+    private fun containsLanguageLabel(view: View): Boolean {
+        if (view is TextView) {
+            val text = sequenceOf(view.text, view.contentDescription)
+                .filterNotNull()
+                .joinToString(" ")
+                .lowercase()
+            val languageLabels = listOf("language", "语言", "язык", "idioma", "langue", "lingua", "sprache", "言語")
+            if (languageLabels.any(text::contains)) return true
+        }
+        val group = view as? ViewGroup ?: return false
+        return (0 until group.childCount).any { containsLanguageLabel(group.getChildAt(it)) }
     }
 
     private fun findActivity(context: Context): Activity? {

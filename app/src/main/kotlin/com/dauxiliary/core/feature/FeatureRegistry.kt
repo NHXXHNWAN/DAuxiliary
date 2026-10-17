@@ -34,7 +34,7 @@ object FeatureRegistry {
         FeatureDefinition(
             id = TelegramAutoSignHook.FEATURE_ID,
             title = "Telegram 自动签到",
-            summary = "仅观察已学习的签到目标与回复；自动发送尚未启用，未知 fork 安全降级。",
+            summary = "学习明确的签到按钮并通过宿主账号发送回调；按回复结果记录已签到、退避或待确认状态。",
             category = FeatureCategory.CHAT,
             hosts = setOf(AppTarget.TELEGRAM),
             implemented = true,

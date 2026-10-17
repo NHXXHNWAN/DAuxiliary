@@ -7,11 +7,7 @@ import android.os.Build
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.TextView
-import android.graphics.drawable.Drawable
-import android.view.Gravity
+import android.window.OnBackInvokedCallback
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.OnBackPressedDispatcherOwner
 import androidx.compose.ui.platform.ComposeView
@@ -31,6 +27,7 @@ import com.dauxiliary.ui.theme.AppTheme
 /** Opens Telegram-only DAuxiliary settings inside the current Telegram Activity. */
 internal object TelegramInProcessSettings {
     private const val VIEW_TAG = "dauxiliary.telegram.settings.view"
+    private const val OVERLAY_TAG = "dauxiliary.telegram.settings.overlay"
 
     fun open(context: Context, classLoader: ClassLoader) {
         HostActivityTracker.register(context)
@@ -56,35 +53,46 @@ internal object TelegramInProcessSettings {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
         }
         val overlay = FrameLayout(activity).apply {
-            tag = VIEW_TAG
-            setBackgroundColor(Color.WHITE)
+            tag = OVERLAY_TAG
+            setBackgroundColor(Color.TRANSPARENT)
             addView(composeView, FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
         }
         // Attach the owner and the ComposeView to the real window before starting
         // composition. Starting composition while the view is detached can make
         // Compose consume saved state before the registry is in CREATED state.
         content.addView(overlay, FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
-        lifecycleOwner.performStart()
-        composeView.setContent { AppTheme { InjectedModuleSettings(AppTarget.TELEGRAM) } }
 
+        var closed = false
+        var dispatcherCallback: OnBackPressedCallback? = null
+        var platformCallback: OnBackInvokedCallback? = null
         fun close() {
+            if (closed) return
+            closed = true
+            dispatcherCallback?.remove()
+            if (Build.VERSION.SDK_INT >= 33) {
+                platformCallback?.let { activity.onBackInvokedDispatcher.unregisterOnBackInvokedCallback(it) }
+            }
             if (overlay.parent === content) content.removeView(overlay)
             lifecycleOwner.performDetach()
         }
+        composeView.setContent { AppTheme { InjectedModuleSettings(AppTarget.TELEGRAM) } }
+        composeView.post {
+            if (!closed && composeView.isAttachedToWindow) lifecycleOwner.performStart()
+        }
+
         if (activity is OnBackPressedDispatcherOwner) {
-            activity.onBackPressedDispatcher.addCallback(
-                activity,
-                object : OnBackPressedCallback(true) {
-                    override fun handleOnBackPressed() {
-                        isEnabled = false
-                        close()
-                    }
-                },
-            )
+            val callback = object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() = close()
+            }
+            dispatcherCallback = callback
+            activity.onBackPressedDispatcher.addCallback(activity, callback)
         } else if (Build.VERSION.SDK_INT >= 33) {
+            val callback = OnBackInvokedCallback { close() }
+            platformCallback = callback
             activity.onBackInvokedDispatcher.registerOnBackInvokedCallback(
                 android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,
-            ) { close() }
+                callback,
+            )
         }
     }
 
@@ -127,10 +135,18 @@ internal object TelegramInProcessSettings {
         }
 
         fun performDetach() {
-            if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
-                lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
-                lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
-                lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+            when (lifecycle.currentState) {
+                Lifecycle.State.RESUMED -> {
+                    lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+                    lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+                    lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+                }
+                Lifecycle.State.STARTED -> {
+                    lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+                    lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+                }
+                Lifecycle.State.CREATED -> lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+                else -> Unit
             }
         }
     }

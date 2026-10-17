@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -14,14 +16,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.dauxiliary.core.config.ConfigStore
+import com.dauxiliary.core.telegram.AccountIdentityResolver
 import com.dauxiliary.core.telegram.TelegramAuthorization
 import com.dauxiliary.core.telegram.TelegramPrefs
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 
 /** Telegram-only page. /code is self-service; /auth remains Bot-admin-only. */
+private fun formatRetryAt(atMillis: Long): String {
+    val remaining = (atMillis - System.currentTimeMillis()).coerceAtLeast(0L)
+    val minutes = (remaining + 59_999L) / 60_000L
+    return if (minutes < 60L) "约 ${minutes} 分钟" else "约 ${minutes / 60L} 小时"
+}
+
 @Composable
 internal fun TelegramAutoSignPage() {
     val context = LocalContext.current
@@ -32,7 +42,17 @@ internal fun TelegramAutoSignPage() {
     var authorized by remember { mutableStateOf(prefs.authorized()) }
     var checking by remember { mutableStateOf(false) }
     var statusText by remember { mutableStateOf("") }
-    val targets = remember(context) { prefs.targets().toList().sorted() }
+    var refreshTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(context) {
+        while (true) {
+            delay(5_000L)
+            refreshTick++
+        }
+    }
+    val account = remember(context, refreshTick) {
+        AccountIdentityResolver.resolve(context.classLoader, context.packageName)
+    }
+    val targets = remember(context, account, refreshTick) { prefs.targets(account).toList().sorted() }
 
     InjectedGroupedPage(title = "Telegram 授权与签到") {
         item { SmallTitle(text = "授权状态") }
@@ -102,9 +122,19 @@ internal fun TelegramAutoSignPage() {
         item { SmallTitle(text = "自动签到") }
         item {
             InjectedGroupCard {
-                BasicComponent(title = "自动签到接入", summary = if (authorized) "授权通过，功能按模块配置运行。" else "需要 Telegram 模块授权后才会运行。")
+                BasicComponent(title = "自动签到接入", summary = if (authorized) "授权通过；会学习并发送明确的签到按钮回调。未知或无法适配的接口会安全停止。" else "需要 Telegram 模块授权后才会运行。")
                 if (targets.isEmpty()) BasicComponent(title = "暂无目标", summary = "学习签到目标后会显示在这里。")
-                targets.forEach { id -> BasicComponent(title = id, summary = if (prefs.signedToday(id)) "今日已签到" else "等待签到") }
+                targets.forEach { id ->
+                    val summary = when {
+                        prefs.signedToday(id, account) -> "今日已签到"
+                        prefs.inFlight(id, account) -> "正在发送签到请求"
+                        prefs.pendingToday(id, account) -> "待确认：未能判定签到结果"
+                        prefs.retryAt(id, account) > System.currentTimeMillis() -> "退避中，稍后自动重试（${formatRetryAt(prefs.retryAt(id, account))}）"
+                        prefs.learnedButton(account, id) != null -> "已学习按钮，等待签到"
+                        else -> "等待学习签到按钮"
+                    }
+                    BasicComponent(title = id, summary = summary)
+                }
             }
         }
         item { SmallTitle(text = "使用说明") }

@@ -25,7 +25,23 @@ class SignLogicTest {
     @Test fun skipDecisionProtectsDuplicateExecution() {
         assertEquals(SignLogic.SKIP_IN_FLIGHT, SignLogic.shouldSend(false, true, false, false, 0, 10))
         assertEquals(SignLogic.SKIP_SIGNED, SignLogic.shouldSend(true, false, false, false, 0, 10))
+        assertEquals(SignLogic.SKIP_PENDING, SignLogic.shouldSend(false, false, true, false, 0, 10))
+        assertEquals(SignLogic.SKIP_DISABLED, SignLogic.shouldSend(false, false, false, true, 0, 10))
         assertEquals(SignLogic.SKIP_BACKOFF, SignLogic.shouldSend(false, false, false, false, 20, 10))
         assertEquals(SignLogic.SKIP_NONE, SignLogic.shouldSend(false, false, false, false, 10, 10))
+    }
+
+    @Test fun onlyExplicitSignButtonsAreEligibleForAutomation() {
+        assertTrue(SignLogic.looksLikeSignButton("✅ 每日签到"))
+        assertTrue(SignLogic.looksLikeSignButton("Check in"))
+        assertFalse(SignLogic.looksLikeSignButton("返回主菜单"))
+        assertFalse(SignLogic.looksLikeSignButton("账户信息"))
+        assertFalse(SignLogic.looksLikeSignButton("", "sign_daily"))
+    }
+
+    @Test fun normalizesUnicodeAndPeerIds() {
+        assertEquals("-12345", SignLogic.normalizeId("群：－12345"))
+        assertEquals("12345", SignLogic.normalizeId("@bot 12-345"))
+        assertEquals("", SignLogic.normalizeId("not an id"))
     }
 }

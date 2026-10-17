@@ -76,12 +76,24 @@ object SignLogic {
         if (contains(text, duplicateWords) || contains(text, successWords)) return SIGNED
         return UNKNOWN
     }
+    private val signButtonWords = listOf(
+        "签到", "打卡", "领取", "每日", "今日", "check-in", "checkin", "check in", "sign in", "signin", "daily", "reward",
+    )
+
+    /** Conservative learning gate: only buttons with an explicit sign-in/reward cue are automated. */
+    fun looksLikeSignButton(text: String?, data: String? = null): Boolean {
+        val visible = text.orEmpty().lowercase()
+        if (visible.isBlank()) return false
+        if (isNavigationButton(visible, data)) return false
+        return signButtonWords.any(visible::contains)
+    }
 
     fun isNavigationButton(text: String?, data: String? = null): Boolean {
         val value = "${text.orEmpty()} ${data.orEmpty()}".lowercase()
         if (listOf("签到", "打卡", "领取", "check", "sign", "daily", "reward").any(value::contains)) return false
         return listOf("返回", "后退", "主菜单", "首页", "关闭", "取消", "退出", "back", "menu", "home", "cancel", "close").any(value::contains)
     }
+
 
     fun shouldSend(signedToday: Boolean, inFlight: Boolean, pending: Boolean, disabled: Boolean, retryAt: Long, now: Long): Int = when {
         inFlight -> SKIP_IN_FLIGHT

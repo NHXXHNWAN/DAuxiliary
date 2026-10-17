@@ -7,18 +7,21 @@ internal object AccountIdentityResolver {
     private const val TAG = "DAuxiliary-Telegram"
 
     fun resolve(loader: ClassLoader, packageName: String): String {
-        val userConfig = runCatching { loader.loadClass("org.telegram.messenger.UserConfig") }.getOrNull()
-        if (userConfig != null) {
-            val names = listOf("selectedAccount", "selectedAccountIndex", "currentAccount")
-            for (name in names) {
-                val value = readStaticInt(userConfig, name) ?: continue
-                if (value in 0..99) return "slot_$value"
-            }
-        }
+        resolveIndex(loader)?.let { return "slot_$it" }
         // A process-scoped fallback is deliberately explicit; it avoids merging data
         // between clients while diagnostics can still report that true account identity is unknown.
         Log.d(TAG, "Telegram account slot unavailable; using process fallback")
         return "process_${packageName.replace(Regex("[^A-Za-z0-9_.-]"), "_")}"
+    }
+
+    fun resolveIndex(loader: ClassLoader): Int? {
+        val userConfig = runCatching { loader.loadClass("org.telegram.messenger.UserConfig") }.getOrNull() ?: return null
+        val names = listOf("selectedAccount", "selectedAccountIndex", "currentAccount")
+        for (name in names) {
+            val value = readStaticInt(userConfig, name) ?: continue
+            if (value in 0..99) return value
+        }
+        return null
     }
 
     private fun readStaticInt(type: Class<*>, name: String): Int? = runCatching {
