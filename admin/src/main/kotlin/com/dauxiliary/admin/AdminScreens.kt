@@ -34,8 +34,6 @@ import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.basic.FloatingNavigationBar
-import top.yukonga.miuix.kmp.basic.FloatingNavigationBarItem
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.NavigationItem
@@ -267,16 +265,14 @@ internal fun AdminDashboard(
             )
         },
         bottomBar = {
-            FloatingNavigationBar(defaultWindowInsetsPadding = false) {
-                navigationItems.forEachIndexed { index, item ->
-                    FloatingNavigationBarItem(
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        icon = item.icon,
-                        label = item.label,
-                    )
-                }
-            }
+            IosLiquidGlassNavigationBar(
+                items = navigationItems,
+                selectedIndex = currentTab,
+                onItemClick = { selectedTab = it },
+                backdrop = contentBackdrop,
+                isBlurActive = true,
+                modifier = Modifier.padding(horizontal = 8.dp),
+            )
         },
     ) { padding ->
         Box(

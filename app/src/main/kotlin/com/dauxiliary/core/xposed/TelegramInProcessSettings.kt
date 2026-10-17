@@ -55,6 +55,10 @@ internal object TelegramInProcessSettings {
         val overlay = FrameLayout(activity).apply {
             tag = OVERLAY_TAG
             setBackgroundColor(Color.TRANSPARENT)
+            // Compose and NagramXF resolve tree owners from the nearest parent during measure.
+            // Installing them only on ComposeView is too late for the injected FrameLayout path.
+            setViewTreeLifecycleOwner(lifecycleOwner)
+            setViewTreeSavedStateRegistryOwner(lifecycleOwner)
             addView(composeView, FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
         }
         // Attach the owner and the ComposeView to the real window before starting

@@ -2,9 +2,13 @@
 
 ## 2026-10-18
 
-### REA Android 逆向分析链路恢复
+### 本次回归修复
 
-- 补齐 REA 使用 JADX 进行 Android 静态分析所需的 `jadx-headless-mcp` 引擎，使用 `jadx-headless-mcp-0.7.1-all.jar`。
+- 修复 admin 页面误用默认 Miuix `FloatingNavigationBar` 的回归，恢复管理端的 iOS-like 液态玻璃悬浮底栏、拖拽选中动画和模糊背景效果。
+- 修复 NagramXF 点击 DAuxiliary 设置入口后的崩溃：注入层级的 `FrameLayout` 现在同时绑定 `ViewTreeLifecycleOwner` 和 `ViewTreeSavedStateRegistryOwner`，解决 NagramXF 在测量阶段从父容器查找 owner 时抛出的 `ViewTreeLifecycleOwner not found`。
+- 使用 NagramXF 崩溃日志完成针对性验证；日志根因位于注入 `FrameLayout` 的 ViewTree owner 缺失，而不是设置入口反射或 Compose 内容路由错误。
+
+### REA Android 逆向分析链路恢复
 - 引擎 SHA-256 为 `6e5eacf500b64292bfb73c49797c1958f6ee44646e43e868039ae7feb573ff75`，与 GitHub Release v0.7.1 官方校验值一致。
 - 将 `REA_JADX_MCP_JAR` 固化为 `/root/.local/share/rea/jadx-headless-mcp-0.7.1-all.jar`，REA 新会话可直接发现 JADX 引擎。
 - 通过 `rea setup --skill --yes` 安装并对齐 `reverse-engineer-anything` skill；skill version 42，包含 207 个工具及 Android、证据工作流、连接恢复、原生产物等参考文档。
@@ -17,8 +21,8 @@
 ### Admin 独立管理应用重构
 
 - 重构 admin 入口与页面路由，新增 `AdminRoute`，将管理应用组织为清晰的页面状态和底栏导航结构。
-- 接入 Miuix 官方 `FloatingNavigationBar` 及对应导航项，移除 admin 原有自绘 `AdminLiquidNavigationBar` 实现。
-- 将 admin 页面收敛为单一滚动内容结构，处理底栏与页面内容之间的间距，降低切换时的闪退、遮挡和布局粘连风险。
+- 接入 admin 模块的 iOS-like 液态玻璃悬浮底栏，包含拖拽选中动画、液态高光、模糊背景和底部安全区处理。
+- 修正此前误将 admin 底栏切换回默认 `FloatingNavigationBar` 的回归；admin 不再使用默认 Miuix 底栏作为管理端主导航。
 - 管理端底栏拆分为三个明确页面：`总览`、`用户授权`、`Bot 角色`。
 - 为三个页面使用差异化 Miuix 图标，避免导航项视觉同质化，并修正图标 API 的导入与调用方式以匹配 Miuix `0.9.4-rc01`。
 - 完善总览数据、用户授权操作、Bot 角色选择和授权撤销交互；管理页面保持宿主与功能项固定启用的产品约束。
