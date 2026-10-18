@@ -7,14 +7,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.core.registry.AppTarget
 import com.dauxiliary.ui.miuix.component.liquid.IosLiquidGlassNavigationBar
 import kotlinx.coroutines.launch
@@ -37,7 +35,6 @@ fun InjectedModuleSettings(host: AppTarget) {
         drawRect(surface)
         drawContent()
     }
-    var selectedPage by remember { mutableIntStateOf(0) }
     val items = remember {
         listOf(
             NavigationItem("首页", MiuixIcons.Home),
@@ -47,36 +44,33 @@ fun InjectedModuleSettings(host: AppTarget) {
     }
 
     fun selectPage(index: Int) {
-        selectedPage = index
         scope.launch { pagerState.animateScrollToPage(index) }
     }
 
-    MiuixTheme {
-        Box(Modifier.fillMaxSize()) {
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize(),
-                userScrollEnabled = true,
-            ) { page ->
-                when (page) {
-                    0 -> TelegramHomePage()
-                    1 -> HostFeaturePage(host)
-                    2 -> Unit
-                }
+    Box(Modifier.fillMaxSize()) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+            userScrollEnabled = true,
+        ) { page ->
+            when (page) {
+                0 -> TelegramHomePage()
+                1 -> HostFeaturePage(host)
+                2 -> HostSettingsPage(host)
             }
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-            ) {
-                IosLiquidGlassNavigationBar(
-                    items = items,
-                    selectedIndex = selectedPage,
-                    onItemClick = ::selectPage,
-                    backdrop = backdrop,
-                    isBlurActive = true,
-                )
-            }
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+        ) {
+            IosLiquidGlassNavigationBar(
+                items = items,
+                selectedIndex = pagerState.currentPage,
+                onItemClick = ::selectPage,
+                backdrop = backdrop,
+                isBlurActive = true,
+            )
         }
     }
 }
@@ -85,4 +79,27 @@ fun InjectedModuleSettings(host: AppTarget) {
 private fun TelegramHomePage() {
     TelegramAuthorizationSheet()
     HostOverviewPage(AppTarget.TELEGRAM)
+}
+
+@Composable
+private fun HostSettingsPage(host: AppTarget) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    InjectedGroupedPage(title = "设置") {
+        item {
+            InjectedGroupCard {
+                top.yukonga.miuix.kmp.basic.BasicComponent(
+                    title = "宿主应用",
+                    summary = host.displayName,
+                )
+                top.yukonga.miuix.kmp.basic.BasicComponent(
+                    title = "模块版本",
+                    summary = com.dauxiliary.BuildConfig.VERSION_NAME,
+                )
+                top.yukonga.miuix.kmp.basic.BasicComponent(
+                    title = "已启用功能",
+                    summary = "${ConfigStore.enabledFeatureIds(context, host).size} 项",
+                )
+            }
+        }
+    }
 }

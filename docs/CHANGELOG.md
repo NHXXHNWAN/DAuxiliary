@@ -2,6 +2,33 @@
 
 ## 2026-10-18
 
+### 本轮 UI 简化与底栏同步修复
+
+- **移除过度图标装饰，恢复简洁高级视觉**：
+  - 主应用首页删除圆形图标容器与 Favorites/Info 图标，改为纯排版驱动（28sp Bold 标题 + 留白）
+  - 状态描述简化为"正在为 N 个宿主提供服务" / "请在 LSPosed 中激活模块并重启目标应用"
+  - 版本号改为单行显示（15sp Medium）
+  - Telegram 授权页删除说明卡片（Card + Row + Icon），改为单段 14sp 文字说明
+  - 注入功能页删除每项功能的分类图标（Home/Messages/Lock/Tune/Info），改为纯 `BasicComponent` 列表
+  - 统一视觉语言：靠字号、字重、留白和语义色构建层次，不再使用装饰性图标
+
+- **修复底栏高亮不跟随滑动**：
+  - 删除独立的 `selectedPage` 状态，底栏 `selectedIndex` 直接绑定到 `pagerState.currentPage`
+  - 用户滑动切换页面时，底栏选中态现在会同步跟随
+
+- **修复底栏动态高度计算**：
+  - `InjectedGroupedPage` 改为动态读取系统导航栏 insets：`64.dp + 8.dp + WindowInsets.navigationBars.bottom`
+  - 此前硬编码 76dp 会在有导航栏的设备上被底栏遮挡内容（实际高度可达 120dp）
+  - 现在底部 padding 会根据导航栏实际高度自适应
+
+- **增加注入设置页"设置"标签页内容**：
+  - 此前第 3 个标签页是空白 `Unit`，现在显示宿主应用名称、模块版本、已启用功能数量
+  - 三个底栏页面（首页/功能/设置）现在都有实际内容
+
+- **清理过时 import**：
+  - `HostSpecificPages.kt` 删除 `Icon`、`MiuixIcons.*`、`FeatureCategory`、`Row`、`Alignment`、`ImageVector`
+  - `InjectedModuleSettings.kt` 删除 `mutableIntStateOf`、`getValue`、`setValue`
+
 ### 本轮全面 UI 优化
 
 - **主应用首页视觉升级**：

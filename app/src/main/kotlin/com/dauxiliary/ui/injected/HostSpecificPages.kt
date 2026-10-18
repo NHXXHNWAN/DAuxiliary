@@ -1,39 +1,30 @@
 package com.dauxiliary.ui.injected
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.dauxiliary.BuildConfig
 import com.dauxiliary.core.config.ConfigStore
-import com.dauxiliary.core.feature.FeatureCategory
 import com.dauxiliary.core.feature.FeatureDefinition
 import com.dauxiliary.core.feature.FeatureRegistry
 import com.dauxiliary.core.registry.AppTarget
 import com.dauxiliary.ui.page.LocalNavigationPadding
 import top.yukonga.miuix.kmp.basic.BasicComponent
-import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.SmallTitle
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Home
-import top.yukonga.miuix.kmp.icon.extended.Info
-import top.yukonga.miuix.kmp.icon.extended.Lock
-import top.yukonga.miuix.kmp.icon.extended.Messages
-import top.yukonga.miuix.kmp.icon.extended.Settings
-import top.yukonga.miuix.kmp.icon.extended.Tune
 
 @Composable
 internal fun HostOverviewPage(host: AppTarget) {
@@ -105,36 +96,20 @@ private fun HostFeatureItem(
         }
     }
 
-    val categoryIcon = when (feature.category) {
-        FeatureCategory.HOME -> MiuixIcons.Home
-        FeatureCategory.CHAT -> MiuixIcons.Messages
-        FeatureCategory.PRIVACY -> MiuixIcons.Lock
-        FeatureCategory.BEAUTIFY -> MiuixIcons.Tune
-        FeatureCategory.DEBUG -> MiuixIcons.Info
-    }
-
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = categoryIcon,
-            contentDescription = null,
-            modifier = Modifier.size(24.dp).padding(end = 12.dp),
-        )
-        BasicComponent(
-            modifier = Modifier.weight(1f),
-            title = feature.title,
-            summary = feature.summary,
-            endActions = {
-                top.yukonga.miuix.kmp.basic.Switch(
-                    checked = enabled,
-                    onCheckedChange = {
-                        enabled = it
-                        // 宿主进程内通过 ContentProvider 写入模块 prefs
-                        ConfigStore.setFeatureEnabled(context, host, feature.id, it)
-                    },
-                )
-            },
-        )
-    }
+    BasicComponent(
+        title = feature.title,
+        summary = feature.summary,
+        endActions = {
+            top.yukonga.miuix.kmp.basic.Switch(
+                checked = enabled,
+                onCheckedChange = {
+                    enabled = it
+                    // 宿主进程内通过 ContentProvider 写入模块 prefs
+                    ConfigStore.setFeatureEnabled(context, host, feature.id, it)
+                },
+            )
+        },
+    )
 }
 
 @Composable
@@ -142,9 +117,14 @@ internal fun InjectedGroupedPage(
     title: String,
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
-    // 注入导航栏高度，用于 GroupedPage 底部 padding
-    val navigationPadding = remember {
-        PaddingValues(bottom = 64.dp + 12.dp) // 底栏高度 64dp + 悬浮间距 12dp
+    // 动态计算底栏真实高度：64dp 底栏 + 8dp 悬浮间距 + 系统导航栏高度
+    val navBarHeight = androidx.compose.foundation.layout.WindowInsets.navigationBars
+        .only(androidx.compose.foundation.layout.WindowInsetsSides.Bottom)
+        .asPaddingValues()
+        .calculateBottomPadding()
+    val bottomPadding = 64.dp + 8.dp + navBarHeight
+    val navigationPadding = remember(bottomPadding) {
+        PaddingValues(bottom = bottomPadding)
     }
     CompositionLocalProvider(LocalNavigationPadding provides navigationPadding) {
         com.dauxiliary.ui.page.GroupedPage(title = title, content = content)

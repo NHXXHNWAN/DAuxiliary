@@ -134,38 +134,12 @@ fun HomePage(
                 onClick = {},
             ) {
                 Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(
-                            text = if (moduleActive) "模块已激活" else "模块未激活",
-                            color = titleColor,
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .background(
-                                    accentColor.copy(alpha = 0.15f),
-                                    CircleShape
-                                ),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = if (moduleActive) {
-                                    MiuixIcons.Favorites
-                                } else {
-                                    MiuixIcons.Info
-                                },
-                                contentDescription = null,
-                                tint = accentColor,
-                                modifier = Modifier.size(24.dp),
-                            )
-                        }
-                    }
+                    Text(
+                        text = if (moduleActive) "模块已激活" else "模块未激活",
+                        color = titleColor,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
                     Spacer(Modifier.height(12.dp))
                     Text(
                         text = if (moduleActive) {
@@ -177,26 +151,13 @@ fun HomePage(
                         fontSize = 14.sp,
                         lineHeight = 20.sp,
                     )
-                    Spacer(Modifier.height(16.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .background(
-                                    accentColor,
-                                    CircleShape
-                                )
-                        )
-                        Text(
-                            text = "${if (moduleActive) "运行中" else "未激活"} · ${BuildConfig.VERSION_NAME}",
-                            color = accentColor,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium,
-                        )
-                    }
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = BuildConfig.VERSION_NAME,
+                        color = accentColor,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
                 }
             }
         }
