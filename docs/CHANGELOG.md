@@ -2,6 +2,69 @@
 
 ## 2026-10-18
 
+### 官方 iOS-like 液态玻璃底栏移植
+
+- **从 Miuix example 移植完整 iOS-like 底栏实现**：
+  - 移植 `IosLiquidGlassNavigationBar` 及全部依赖组件（`DampedDragAnimation`、`InteractiveHighlight`、`CombinedBackdrop`、`InnerShadow`、`Lens`、`Vibrancy`）到 `app` 与 `admin` 模块
+  - 包名统一为 `com.dauxiliary.ui.miuix.component.{liquid,animation}`
+  - 替换 `import ui.isInDarkTheme` 为项目内 `@Composable private fun isInDarkTheme(): Boolean = isSystemInDarkTheme()`
+  - 完全符合官方示例 (`github.com/compose-miuix-ui/miuix/example`) 的结构与视觉规范
+  
+- **三端统一接入 iOS-like 底栏**：
+  - 主应用 (`DAuxiliaryApp`)：保留 `navigationBarStyle` 切换逻辑，`== 1` 时使用 `IosLiquidGlassNavigationBar`
+  - 后台管理 (`admin/AdminScreens`)：三页面 Tab (总览/用户授权/Bot 角色) 全部使用液态玻璃底栏
+  - 注入设置 (`InjectedModuleSettings`)：Telegram 宿主内三页面 Tab (首页/功能/设置) 使用液态玻璃底栏
+  - 全部调用点统一遵循官方底栏 API：`items: List<NavigationItem>`, `selectedIndex`, `backdrop`, `isBlurActive`
+  
+- **底部边距动态适配**：
+  - 组件内部 `bottomPaddingValue = when (platform()) { Platform.IOS -> 20.dp; else -> if (navBarBottomPadding != 0.dp) 8.dp + navBarBottomPadding else 36.dp }`
+  - `navBarBottomPadding` 通过 `WindowInsets.navigationBars.only(WindowInsetsSides.Bottom).asPaddingValues().calculateBottomPadding()` 动态读取
+  - 胶囊水平边距 `start/end = 24.dp`，高度 `64.dp`，内 padding `4.dp`
+  - 选中态通过 `LocalContentColor` + 背景透明度控制，不遮挡图标
+  
+- **验证完成**：
+  - `:app:assembleDebug` ✓ (74 tasks)
+  - `:admin:assembleDebug` ✓ (74 tasks)
+  - 编译耗时 8m 35s，12 executed, 62 up-to-date
+
+修复问题：
+- 底部边距不协调 → 现动态读取系统导航栏 insets
+- 选中图标被遮挡 → 官方实现通过 `CompositionLocalProvider(LocalContentColor)` + 低透明度背景规避
+- admin 底栏未改 → 已完整移植并接入液态玻璃底栏
+
+### 本轮底栏规范化与 UI 简化
+
+- **改用 Miuix 官方底栏 API**：
+  - 应用主界面、admin 管理页、注入设置页全部改为使用官方 `FloatingNavigationBar` + `FloatingNavigationBarItem`
+  - 删除所有自定义参数（`horizontalOutSidePadding`等），使用 Miuix 默认值
+  - 通过 `Scaffold` 的 `bottomBar` 参数正确集成，自动处理底部 padding
+  - 删除手动计算底栏高度、动态 insets、重复 padding 注入等所有 workaround 代码
+
+- **移除过度图标装饰**：
+  - 主应用首页删除圆形图标容器（48dp Box + Favorites/Info 图标）
+  - 状态改为纯排版：28sp Bold 标题 + 15sp Medium 版本号单行
+  - Telegram 授权页删除说明卡片（Card + Row + Icon），改为 14sp 单段文字
+  - 注入功能页删除每项功能的分类图标（Home/Messages/Lock/Tune/Info）
+  - 统一视觉语言：靠字号、字重、留白和语义色构建层次
+
+- **修复底栏选中态同步**：
+  - 删除独立的 `selectedPage` 状态，底栏 `selected` 直接绑定 `pagerState.currentPage`
+  - 用户滑动切换页面时，底栏选中态实时跟随
+
+- **修复底栏 padding 叠加**：
+  - `InjectedGroupedPage` 不再注入 `LocalNavigationPadding`（76dp）
+  - `HorizontalPager` 直接使用 `Scaffold` 传入的 `padding`（`.padding(padding)`）
+  - 避免 Scaffold padding + 手动 padding + LocalNavigationPadding 三重叠加造成底部大块空白
+
+- **增加注入设置"设置"标签页内容**：
+  - 此前第 3 个标签页是空白 `Unit`
+  - 现在显示宿主应用名称、模块版本、已启用功能数量
+
+- **清理过时 import**：
+  - 删除 `IosLiquidGlassNavigationBar`、`rememberLayerBackdrop`、`MiuixTheme`、`NavigationItem`
+  - 删除 `WindowInsets.navigationBars`、`CompositionLocalProvider`、`LocalNavigationPadding`
+  - 删除 `Icon`、`MiuixIcons.*`、`FeatureCategory`、`Row`、`Alignment`等装饰性组件 import
+
 ### 本轮 UI 简化与底栏同步修复
 
 - **移除过度图标装饰，恢复简洁高级视觉**：

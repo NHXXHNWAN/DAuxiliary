@@ -2,14 +2,12 @@ package com.dauxiliary.ui.injected
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.dauxiliary.core.config.ConfigStore
@@ -18,6 +16,7 @@ import com.dauxiliary.ui.miuix.component.liquid.IosLiquidGlassNavigationBar
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.NavigationItem
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Home
@@ -30,12 +29,12 @@ fun InjectedModuleSettings(host: AppTarget) {
     val scope = rememberCoroutineScope()
     val pageCount = 3
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { pageCount })
-    val surface = MiuixTheme.colorScheme.surface
-    val backdrop = rememberLayerBackdrop {
-        drawRect(surface)
+    val surfaceColor = MiuixTheme.colorScheme.surface
+    val contentBackdrop = rememberLayerBackdrop {
+        drawRect(surfaceColor)
         drawContent()
     }
-    val items = remember {
+    val navigationItems = remember {
         listOf(
             NavigationItem("首页", MiuixIcons.Home),
             NavigationItem("功能", MiuixIcons.Layers),
@@ -47,30 +46,35 @@ fun InjectedModuleSettings(host: AppTarget) {
         scope.launch { pagerState.animateScrollToPage(index) }
     }
 
-    Box(Modifier.fillMaxSize()) {
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-            userScrollEnabled = true,
-        ) { page ->
-            when (page) {
-                0 -> TelegramHomePage()
-                1 -> HostFeaturePage(host)
-                2 -> HostSettingsPage(host)
-            }
-        }
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-        ) {
+    Scaffold(
+        bottomBar = {
             IosLiquidGlassNavigationBar(
-                items = items,
+                items = navigationItems,
                 selectedIndex = pagerState.currentPage,
                 onItemClick = ::selectPage,
-                backdrop = backdrop,
+                backdrop = contentBackdrop,
                 isBlurActive = true,
             )
+        },
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .layerBackdrop(contentBackdrop),
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                userScrollEnabled = true,
+            ) { page ->
+                when (page) {
+                    0 -> TelegramHomePage()
+                    1 -> HostFeaturePage(host)
+                    2 -> HostSettingsPage(host)
+                }
+            }
         }
     }
 }

@@ -1,15 +1,9 @@
 package com.dauxiliary.ui.injected
 
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,7 +16,6 @@ import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.core.feature.FeatureDefinition
 import com.dauxiliary.core.feature.FeatureRegistry
 import com.dauxiliary.core.registry.AppTarget
-import com.dauxiliary.ui.page.LocalNavigationPadding
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.SmallTitle
 
@@ -117,18 +110,9 @@ internal fun InjectedGroupedPage(
     title: String,
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
-    // 动态计算底栏真实高度：64dp 底栏 + 8dp 悬浮间距 + 系统导航栏高度
-    val navBarHeight = androidx.compose.foundation.layout.WindowInsets.navigationBars
-        .only(androidx.compose.foundation.layout.WindowInsetsSides.Bottom)
-        .asPaddingValues()
-        .calculateBottomPadding()
-    val bottomPadding = 64.dp + 8.dp + navBarHeight
-    val navigationPadding = remember(bottomPadding) {
-        PaddingValues(bottom = bottomPadding)
-    }
-    CompositionLocalProvider(LocalNavigationPadding provides navigationPadding) {
-        com.dauxiliary.ui.page.GroupedPage(title = title, content = content)
-    }
+    // 外层 Scaffold 已通过 bottomBar 的 padding 处理底栏高度，这里不再重复注入，
+    // 否则会出现双重底部留白。
+    com.dauxiliary.ui.page.GroupedPage(title = title, content = content)
 }
 
 @Composable

@@ -15,9 +15,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
@@ -89,7 +94,7 @@ import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.Platform
 import top.yukonga.miuix.kmp.utils.platform
-import com.dauxiliary.ui.theme.isAppInDarkTheme
+import androidx.compose.foundation.isSystemInDarkTheme
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -97,6 +102,9 @@ import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sign
 import kotlin.math.sin
+
+@Composable
+private fun isInDarkTheme(): Boolean = isSystemInDarkTheme()
 
 private val LocalIosTabScale = staticCompositionLocalOf { { 1f } }
 
@@ -196,7 +204,7 @@ internal fun IosLiquidGlassNavigationBar(
     modifier: Modifier = Modifier,
     badge: (Int) -> (@Composable () -> Unit)? = { null },
 ) {
-    val isDark = isAppInDarkTheme()
+    val isDark = isInDarkTheme()
     val pillShape = remember { CircleShape }
     val accentColor = MiuixTheme.colorScheme.primary
     val tabContentColor = MiuixTheme.colorScheme.onSurface
@@ -319,8 +327,15 @@ internal fun IosLiquidGlassNavigationBar(
     val pillHighlight = rememberGravityRotatedHighlight(iosIndicatorSpecular, extraDegrees = 90f)
 
     val combinedBackdrop = backdrop?.let { rememberCombinedBackdrop(it, tabsBackdrop) }
-    val bottomPaddingValue = 12.dp
 
+    val navBarBottomPadding = WindowInsets.navigationBars.only(WindowInsetsSides.Bottom).asPaddingValues().calculateBottomPadding()
+    val bottomPaddingValue = when (platform()) {
+        Platform.IOS -> 20.dp
+
+        else -> {
+            if (navBarBottomPadding != 0.dp) 8.dp + navBarBottomPadding else 36.dp
+        }
+    }
 
     val tabsContent: @Composable RowScope.() -> Unit = {
         val tabScale = LocalIosTabScale.current
@@ -379,7 +394,7 @@ internal fun IosLiquidGlassNavigationBar(
     Column(modifier = modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier
-                .padding(bottom = bottomPaddingValue, start = 16.dp, end = 16.dp)
+                .padding(bottom = bottomPaddingValue, start = 24.dp, end = 24.dp)
                 .fillMaxWidth(),
             contentAlignment = Alignment.CenterStart,
         ) {
@@ -448,6 +463,40 @@ internal fun IosLiquidGlassNavigationBar(
                     content = tabsContent,
                 )
             }
+
+            if (isBlurActive && backdrop != null) {
+                CompositionLocalProvider(
+                    LocalIosTabScale provides { lerp(1f, 1.2f, dampedDrag.pressProgress) },
+                    LocalContentColor provides accentColor,
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .clearAndSetSemantics {}
+                            .alpha(0f)
+                            .layerBackdrop(tabsBackdrop)
+                            .graphicsLayer { translationX = panelOffset }
+                            .drawBackdrop(
+                                backdrop = backdrop,
+                                shape = { pillShape },
+                                effects = {
+                                    vibrancy()
+                                    blur(4.dp.toPx(), 4.dp.toPx())
+                                    lens(
+                                        refractionHeight = 24.dp.toPx(),
+                                        refractionAmount = 24.dp.toPx(),
+                                    )
+                                },
+                                onDrawSurface = { drawRect(containerColor) },
+                            )
+                            .then(interactiveHighlight.modifier)
+                            .height(56.dp)
+                            .padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        content = tabsContent,
+                    )
+                }
+            }
+
             if (tabWidthPx > 0f) {
                 val tabWidthDp = with(density) { tabWidthPx.toDp() }
                 if (isBlurActive && combinedBackdrop != null) {

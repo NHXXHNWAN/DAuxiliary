@@ -37,6 +37,7 @@ import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.NavigationItem
+import com.dauxiliary.ui.miuix.component.liquid.IosLiquidGlassNavigationBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -244,18 +245,16 @@ internal fun AdminDashboard(
     }
     val pageTitles = listOf("管理概览", "用户授权", "Bot 角色")
     val currentTab = selectedTab.coerceIn(0, 2)
-    val navigationItems = remember {
-        listOf(
-            NavigationItem("总览", MiuixIcons.Home),
-            NavigationItem("用户授权", MiuixIcons.Layers),
-            NavigationItem("Bot 角色", MiuixIcons.Settings),
-        )
-    }
     val surfaceColor = MiuixTheme.colorScheme.surface
     val contentBackdrop = rememberLayerBackdrop {
         drawRect(surfaceColor)
         drawContent()
     }
+    val navigationItems = listOf(
+        NavigationItem("总览", MiuixIcons.Home),
+        NavigationItem("用户授权", MiuixIcons.Layers),
+        NavigationItem("Bot 角色", MiuixIcons.Settings),
+    )
     Scaffold(
         topBar = {
             TopAppBar(
@@ -271,7 +270,6 @@ internal fun AdminDashboard(
                 onItemClick = { selectedTab = it },
                 backdrop = contentBackdrop,
                 isBlurActive = true,
-                modifier = Modifier.padding(horizontal = 8.dp),
             )
         },
     ) { padding ->
