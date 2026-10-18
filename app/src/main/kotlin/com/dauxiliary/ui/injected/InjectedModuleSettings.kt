@@ -2,74 +2,107 @@ package com.dauxiliary.ui.injected
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import com.dauxiliary.core.registry.AppTarget
-import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.basic.FloatingNavigationBar
-import top.yukonga.miuix.kmp.basic.FloatingNavigationBarItem
-import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.basic.Check
-import top.yukonga.miuix.kmp.icon.basic.Sidebar
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.compose.ui.unit.dp
+import com.dauxiliary.core.config.ConfigStore
+import com.dauxiliary.core.registry.AppTarget
+import com.dauxiliary.ui.miuix.component.liquid.IosLiquidGlassNavigationBar
+import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.NavigationItem
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Home
+import top.yukonga.miuix.kmp.icon.extended.Layers
+import top.yukonga.miuix.kmp.icon.extended.Settings
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 fun InjectedModuleSettings(host: AppTarget) {
-    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 4 })
     val scope = rememberCoroutineScope()
-    val page = pagerState.currentPage
-    fun select(index: Int) {
+    val pageCount = 3
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { pageCount })
+    val surfaceColor = MiuixTheme.colorScheme.surface
+    val contentBackdrop = rememberLayerBackdrop {
+        drawRect(surfaceColor)
+        drawContent()
+    }
+    val navigationItems = remember {
+        listOf(
+            NavigationItem("首页", MiuixIcons.Home),
+            NavigationItem("功能", MiuixIcons.Layers),
+            NavigationItem("设置", MiuixIcons.Settings),
+        )
+    }
+
+    fun selectPage(index: Int) {
         scope.launch { pagerState.animateScrollToPage(index) }
     }
-    MiuixTheme {
-        Scaffold(
-            bottomBar = {
-                FloatingNavigationBar(horizontalOutSidePadding = 16.dp) {
-                    FloatingNavigationBarItem(
-                        selected = page == 0,
-                        onClick = { select(0) },
-                        icon = MiuixIcons.Basic.Check,
-                        label = "主页",
-                    )
-                    FloatingNavigationBarItem(
-                        selected = page == 1,
-                        onClick = { select(1) },
-                        icon = MiuixIcons.Basic.Sidebar,
-                        label = "功能",
-                    )
-                    FloatingNavigationBarItem(
-                        selected = page == 2,
-                        onClick = { select(2) },
-                        icon = MiuixIcons.Basic.Sidebar,
-                        label = "日志",
-                    )
-                    FloatingNavigationBarItem(
-                        selected = page == 3,
-                        onClick = { select(3) },
-                        icon = MiuixIcons.Basic.Sidebar,
-                        label = "设置",
-                    )
-                }
-            },
+
+    Scaffold(
+        bottomBar = {
+            IosLiquidGlassNavigationBar(
+                items = navigationItems,
+                selectedIndex = pagerState.currentPage,
+                onItemClick = ::selectPage,
+                backdrop = contentBackdrop,
+                isBlurActive = true,
+            )
+        },
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .layerBackdrop(contentBackdrop),
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                HorizontalPager(
-                    state = pagerState,
-                    modifier = Modifier.fillMaxSize(),
-                    userScrollEnabled = true,
-                ) { index ->
-                    when (index) {
-                        0 -> ModuleSettingsHome(host, onOpenFeatures = { select(1) })
-                        1 -> ModuleFeaturePage(host, onBack = { select(0) })
-                        2 -> ModuleLogPage(host, onBack = { select(0) })
-                        3 -> ModuleSettingsPage(host, onBack = { select(0) })
-                    }
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                userScrollEnabled = true,
+            ) { page ->
+                when (page) {
+                    0 -> TelegramHomePage()
+                    1 -> HostFeaturePage(host)
+                    2 -> HostSettingsPage(host)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TelegramHomePage() {
+    TelegramAuthorizationSheet()
+    HostOverviewPage(AppTarget.TELEGRAM)
+}
+
+@Composable
+private fun HostSettingsPage(host: AppTarget) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    InjectedGroupedPage(title = "设置") {
+        item {
+            InjectedGroupCard {
+                top.yukonga.miuix.kmp.basic.BasicComponent(
+                    title = "宿主应用",
+                    summary = host.displayName,
+                )
+                top.yukonga.miuix.kmp.basic.BasicComponent(
+                    title = "模块版本",
+                    summary = com.dauxiliary.BuildConfig.VERSION_NAME,
+                )
+                top.yukonga.miuix.kmp.basic.BasicComponent(
+                    title = "已启用功能",
+                    summary = "${ConfigStore.enabledFeatureIds(context, host).size} 项",
+                )
             }
         }
     }

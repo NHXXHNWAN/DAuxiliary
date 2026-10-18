@@ -19,3 +19,11 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# LibXposed discovers the entry class by its name in java_init.list.
+-adaptresourcefilecontents META-INF/xposed/java_init.list
+-keep class com.dauxiliary.core.xposed.EntryHook {
+    public <init>();
+    *;
+}
+-keep class io.github.libxposed.api.** { *; }

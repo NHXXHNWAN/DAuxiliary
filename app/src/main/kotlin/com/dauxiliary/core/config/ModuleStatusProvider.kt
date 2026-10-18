@@ -12,7 +12,9 @@ class ModuleStatusProvider : ContentProvider() {
         if (method != "record_host_loaded") return null
         val host = AppTarget.entries.firstOrNull { it.name == arg } ?: return null
         val packages = context?.packageManager?.getPackagesForUid(Binder.getCallingUid()).orEmpty()
-        if (host.packageName !in packages) return null
+        // Telegram forks report the same logical host through an alias package. The
+        // caller must still belong to the host package set; never accept arbitrary UIDs.
+        if (packages.none { host.matchesPackage(it) }) return null
         context?.getSharedPreferences("daux_config", android.content.Context.MODE_PRIVATE)
             ?.edit()
             ?.putLong("host_last_seen_${host.name.lowercase()}", System.currentTimeMillis())

@@ -1,0 +1,2 @@
+-keep class com.dauxiliary.core.xposed.EntryHook { *; }
+-keep class com.dauxiliary.core.xposed.PrimaryDexAnchor { *; }

@@ -94,7 +94,7 @@ import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.Platform
 import top.yukonga.miuix.kmp.utils.platform
-import com.dauxiliary.ui.theme.isAppInDarkTheme
+import androidx.compose.foundation.isSystemInDarkTheme
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -102,6 +102,9 @@ import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sign
 import kotlin.math.sin
+
+@Composable
+private fun isInDarkTheme(): Boolean = isSystemInDarkTheme()
 
 private val LocalIosTabScale = staticCompositionLocalOf { { 1f } }
 
@@ -201,7 +204,7 @@ internal fun IosLiquidGlassNavigationBar(
     modifier: Modifier = Modifier,
     badge: (Int) -> (@Composable () -> Unit)? = { null },
 ) {
-    val isDark = isAppInDarkTheme()
+    val isDark = isInDarkTheme()
     val pillShape = remember { CircleShape }
     val accentColor = MiuixTheme.colorScheme.primary
     val tabContentColor = MiuixTheme.colorScheme.onSurface

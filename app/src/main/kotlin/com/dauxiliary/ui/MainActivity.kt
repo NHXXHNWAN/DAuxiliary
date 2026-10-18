@@ -16,6 +16,7 @@ import com.dauxiliary.ui.widgets.DAuxiliaryApp
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ConfigStore.ensureApplicationDefaults(this)
         enableEdgeToEdge()
         setContent {
             var modeIndex by rememberSaveable {

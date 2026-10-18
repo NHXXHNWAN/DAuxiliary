@@ -1,43 +1,88 @@
 package com.dauxiliary.core.xposed
 
-import de.robv.android.xposed.IXposedHookLoadPackage
-import de.robv.android.xposed.XposedBridge
-import de.robv.android.xposed.XposedHelpers
-import de.robv.android.xposed.callbacks.XC_LoadPackage
+import android.util.Log
 import com.dauxiliary.core.config.ConfigStore
+import com.dauxiliary.core.feature.FeatureRegistry
 import com.dauxiliary.core.registry.AppTarget
+import io.github.libxposed.api.XposedModule
+import io.github.libxposed.api.XposedModuleInterface
 
 /**
- * Xposed entry point. Registered in assets/xposed_init.
+ * Modern LibXposed API 102 entry point.
  *
- * Architecture notes:
- * - Keep this class ultra-thin: resolve config, then dispatch to feature hooks.
- * - All feature hooks live in com.dauxiliary.core.xposed.hooks.* and are
- *   registered through a FeatureRegistry so they can be toggled at runtime.
+ * The framework discovers this class from META-INF/xposed/java_init.list and
+ * invokes the package lifecycle callbacks below. No legacy XposedBridge,
+ * XposedHelpers, or XC_* callback is used by the module.
  */
-class EntryHook : IXposedHookLoadPackage {
+class EntryHook : XposedModule() {
+    @Volatile
+    private var loadedProcess: String? = null
 
-    override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
-        val target = AppTarget.fromPackageName(lpparam.packageName) ?: return
-
-        log("Loaded into ${target.displayName} (${lpparam.packageName}, pid=${android.os.Process.myPid()})")
-
-        HostEntryHook.install(target)
-        runCatching {
-            val activityThread = XposedHelpers.findClass("android.app.ActivityThread", null)
-            XposedHelpers.callStaticMethod(activityThread, "currentApplication") as? android.content.Context
-        }.getOrNull()?.let { context ->
-            ConfigStore.recordHostLoaded(context, target)
-        }
-        if (!ConfigStore.isApplicationEnabledInHookedProcess(target.packageName)) return
-
-        // TODO: 在这里注册各宿主的真实功能 Hook；配置入口与 Hook 分发保持独立。
-        // FeatureRegistry.dispatch(lpparam)
+    override fun onModuleLoaded(param: XposedModuleInterface.ModuleLoadedParam) {
+        loadedProcess = param.processName
+        log("Module loaded in ${param.processName}")
     }
-    companion object {
-        fun log(msg: String, throwable: Throwable? = null) {
-            XposedBridge.log("[DAuxiliary] $msg")
-            throwable?.let { XposedBridge.log(it) }
+
+    override fun onPackageReady(param: XposedModuleInterface.PackageReadyParam) {
+        if (loadedProcess?.let { process ->
+                AppTarget.fromPackageName(process.substringBefore(':')) != null
+            } == true) {
+            HostActivityTracker.registerCurrentProcess()
         }
+        val knownTarget = AppTarget.fromPackageName(param.packageName)
+        val target = knownTarget
+            ?: if (TelegramHostSupport.isSupported(param.packageName, param.classLoader)) AppTarget.TELEGRAM else return
+        val process = loadedProcess
+        val processMatchesTarget = if (knownTarget != null) {
+            process == null || target.matchesProcess(process)
+        } else {
+            // A renamed Telegram-Android fork is accepted by marker detection.
+            // Its base package must still match the package currently being readied.
+            process == null || process.substringBefore(':') == param.packageName
+        }
+        if (!processMatchesTarget) {
+            log("Skip ${target.displayName}: non-host process $process")
+            return
+        }
+
+        val remotePreferences = getRemotePreferences(ConfigStore.REMOTE_PREFS_GROUP)
+        ConfigStore.attachRemotePreferences(remotePreferences)
+
+        // Keep native host entry hooks available even when host features are disabled.
+        HostEntryHook.install(this, target, param.classLoader)
+        // Every recognized host is active; host-level enable switches are intentionally removed.
+        log("Package ready: ${target.displayName} (${param.packageName}), enabled=true")
+
+        recordHostHeartbeat(target)
+        FeatureRegistry.dispatch(this, param, target)
+
+        log("Feature dispatch completed for ${target.displayName}")
+    }
+
+    /** Reports a real package-ready event to the module process for truthful UI status. */
+    private fun recordHostHeartbeat(target: AppTarget) {
+        runCatching {
+            val application = Class.forName("android.app.ActivityThread")
+                .getMethod("currentApplication")
+                .invoke(null) as? android.content.Context
+            application?.let { ConfigStore.recordHostLoaded(it, target) }
+        }.onFailure { error ->
+            log(Log.DEBUG, "Unable to record ${target.displayName} heartbeat", error)
+        }
+    }
+
+    override fun onHotReloading(param: XposedModuleInterface.HotReloadingParam): Boolean {
+        FeatureRegistry.resetForHotReload()
+        loadedProcess = null
+        log("Hot reload state reset")
+        return true
+    }
+
+    private fun log(message: String, throwable: Throwable? = null) {
+        log(Log.INFO, message, throwable)
+    }
+
+    private fun log(priority: Int, message: String, throwable: Throwable? = null) {
+        super.log(priority, "DAuxiliary", message, throwable)
     }
 }
