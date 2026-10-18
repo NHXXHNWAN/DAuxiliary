@@ -322,7 +322,7 @@ internal fun IosLiquidGlassNavigationBar(
 
     val combinedBackdrop = backdrop?.let { rememberCombinedBackdrop(it, tabsBackdrop) }
 
-    val bottomPaddingValue = 0.dp
+    val bottomPaddingValue = 12.dp
 
     val tabsContent: @Composable RowScope.() -> Unit = {
         val tabScale = LocalIosTabScale.current
@@ -381,7 +381,7 @@ internal fun IosLiquidGlassNavigationBar(
     Column(modifier = modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier
-                .padding(bottom = bottomPaddingValue, start = 24.dp, end = 24.dp)
+                .padding(bottom = bottomPaddingValue, start = 16.dp, end = 16.dp)
                 .fillMaxWidth(),
             contentAlignment = Alignment.CenterStart,
         ) {
@@ -450,40 +450,6 @@ internal fun IosLiquidGlassNavigationBar(
                     content = tabsContent,
                 )
             }
-
-            if (isBlurActive && backdrop != null) {
-                CompositionLocalProvider(
-                    LocalIosTabScale provides { lerp(1f, 1.2f, dampedDrag.pressProgress) },
-                    LocalContentColor provides accentColor,
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .clearAndSetSemantics {}
-                            .alpha(0f)
-                            .layerBackdrop(tabsBackdrop)
-                            .graphicsLayer { translationX = panelOffset }
-                            .drawBackdrop(
-                                backdrop = backdrop,
-                                shape = { pillShape },
-                                effects = {
-                                    vibrancy()
-                                    blur(4.dp.toPx(), 4.dp.toPx())
-                                    lens(
-                                        refractionHeight = 24.dp.toPx(),
-                                        refractionAmount = 24.dp.toPx(),
-                                    )
-                                },
-                                onDrawSurface = { drawRect(containerColor) },
-                            )
-                            .then(interactiveHighlight.modifier)
-                            .height(56.dp)
-                            .padding(horizontal = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        content = tabsContent,
-                    )
-                }
-            }
-
             if (tabWidthPx > 0f) {
                 val tabWidthDp = with(density) { tabWidthPx.toDp() }
                 if (isBlurActive && combinedBackdrop != null) {

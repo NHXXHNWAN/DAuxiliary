@@ -15,6 +15,13 @@
 - 删除设置页中与当前结构无关的说明文案、签到状态罗列和分类标题；功能开关直接写入对应宿主配置。
 - 按 Miuix `0.9.4-rc01` 的实际 API 修正 `BasicComponent.endActions` 与 `MiuixIcons.Settings` 的调用。
 
+### 本轮注入宿主与导航层修复
+
+- 修复 NagramXF 最新崩溃：为注入的 Compose 根提供 `NavigationEventDispatcherOwner`，解决 `No NavigationEventDispatcher was provided via LocalNavigationEventDispatcherOwner`。
+- 保持 dispatcher 与注入视图生命周期一致，在注入页面销毁时释放导航事件分发器。
+- 重新整理 admin 与 Telegram 注入页的 iOS-like 悬浮底栏绘制层，移除造成双层观感的透明背景捕获副本，只保留单一导航胶囊和单一选中态。
+- 恢复底栏合理的悬浮距离与横向留白，避免上一版贴近屏幕底部、视觉高度过低的问题。
+
 ### REA Android 逆向分析链路恢复
 - 引擎 SHA-256 为 `6e5eacf500b64292bfb73c49797c1958f6ee44646e43e868039ae7feb573ff75`，与 GitHub Release v0.7.1 官方校验值一致。
 - 将 `REA_JADX_MCP_JAR` 固化为 `/root/.local/share/rea/jadx-headless-mcp-0.7.1-all.jar`，REA 新会话可直接发现 JADX 引擎。

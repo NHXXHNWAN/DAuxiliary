@@ -10,7 +10,13 @@ import android.widget.FrameLayout
 import android.window.OnBackInvokedCallback
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.OnBackPressedDispatcherOwner
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.ComposeView
+import androidx.navigationevent.NavigationEventDispatcher
+import androidx.navigationevent.NavigationEventDispatcherOwner
+import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -79,7 +85,20 @@ internal object TelegramInProcessSettings {
             if (overlay.parent === content) content.removeView(overlay)
             lifecycleOwner.performDetach()
         }
-        composeView.setContent { AppTheme { InjectedModuleSettings(AppTarget.TELEGRAM) } }
+        composeView.setContent {
+            val navigationDispatcher = remember { NavigationEventDispatcher() }
+            val navigationOwner = remember(navigationDispatcher) {
+                object : NavigationEventDispatcherOwner {
+                    override val navigationEventDispatcher: NavigationEventDispatcher = navigationDispatcher
+                }
+            }
+            DisposableEffect(navigationDispatcher) {
+                onDispose { navigationDispatcher.dispose() }
+            }
+            CompositionLocalProvider(LocalNavigationEventDispatcherOwner provides navigationOwner) {
+                AppTheme { InjectedModuleSettings(AppTarget.TELEGRAM) }
+            }
+        }
         composeView.post {
             if (!closed && composeView.isAttachedToWindow) lifecycleOwner.performStart()
         }
