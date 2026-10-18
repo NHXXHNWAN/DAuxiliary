@@ -6,11 +6,17 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -19,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -37,9 +44,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Favorites
+import top.yukonga.miuix.kmp.icon.extended.Info
 import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -84,19 +95,26 @@ fun HomePage(
     val moduleActive = remember(refresh) {
         AppTarget.entries.any { ConfigStore.isHostActive(context, it) }
     }
+    val enabledCount = remember(refresh) {
+        ConfigStore.enabledApplicationCount(context)
+    }
     val darkTheme = isAppInDarkTheme()
     val cardColor = if (moduleActive) {
-        if (darkTheme) Color(0xFF304D3D) else Color(0xFFE1F1E5)
+        if (darkTheme) Color(0xFF1A3A2E) else Color(0xFFE8F5E9)
     } else {
-        if (darkTheme) Color(0xFF503C3F) else Color(0xFFF5E3E4)
+        if (darkTheme) Color(0xFF3A2428) else Color(0xFFFCE4EC)
     }
     val accentColor = if (moduleActive) {
-        if (darkTheme) Color(0xFFA9D0B5) else Color(0xFF557E63)
+        if (darkTheme) Color(0xFF66BB6A) else Color(0xFF2E7D32)
     } else {
-        if (darkTheme) Color(0xFFE1B5B8) else Color(0xFF96666A)
+        if (darkTheme) Color(0xFFEF5350) else Color(0xFFC62828)
     }
-    val titleColor = if (darkTheme) MiuixTheme.colorScheme.onSurface else Color(0xFF1F2421)
-    val summaryColor = if (darkTheme) accentColor else Color(0xFF53605A)
+    val titleColor = MiuixTheme.colorScheme.onSurface
+    val summaryColor = if (darkTheme) {
+        MiuixTheme.colorScheme.onSurfaceVariantSummary
+    } else {
+        Color(0xFF616161)
+    }
 
     GroupedPage(
         title = "主页",
@@ -115,26 +133,70 @@ fun HomePage(
                 pressFeedbackType = top.yukonga.miuix.kmp.utils.PressFeedbackType.Tilt,
                 onClick = {},
             ) {
-                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
+                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = if (moduleActive) "模块已激活" else "模块未激活",
+                            color = titleColor,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(
+                                    accentColor.copy(alpha = 0.15f),
+                                    CircleShape
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = if (moduleActive) {
+                                    MiuixIcons.Favorites
+                                } else {
+                                    MiuixIcons.Info
+                                },
+                                contentDescription = null,
+                                tint = accentColor,
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
                     Text(
-                        text = if (moduleActive) "模块已激活" else "模块未激活",
-                        color = titleColor,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = if (moduleActive) "DAuxiliary 正在为已启用的宿主提供服务" else "DAuxiliary 尚未在已启用的宿主中加载",
+                        text = if (moduleActive) {
+                            "DAuxiliary 正在为 $enabledCount 个已启用宿主提供服务"
+                        } else {
+                            "模块尚未在已启用的宿主中加载，请检查 LSPosed/KernelSU 配置"
+                        },
                         color = summaryColor,
                         fontSize = 14.sp,
+                        lineHeight = 20.sp,
                     )
-                    Spacer(Modifier.height(18.dp))
-                    Text(
-                        text = if (moduleActive) "已激活" else "未激活",
-                        color = accentColor,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                    Spacer(Modifier.height(16.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(
+                                    accentColor,
+                                    CircleShape
+                                )
+                        )
+                        Text(
+                            text = "${if (moduleActive) "运行中" else "未激活"} · ${BuildConfig.VERSION_NAME}",
+                            color = accentColor,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
                 }
             }
         }

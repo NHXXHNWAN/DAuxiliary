@@ -2,6 +2,36 @@
 
 ## 2026-10-18
 
+### 本轮全面 UI 优化
+
+- **主应用首页视觉升级**：
+  - 模块状态卡片增加图标装饰（已激活显示 Favorites，未激活显示 Info），提升视觉层次
+  - 状态卡片右上角增加圆形图标容器，带 15% 透明背景和主题色图标
+  - 底部状态指示改为圆点+文字组合样式（运行中/未激活 · 版本号）
+  - 颜色系统优化：激活态使用绿色系（#1A3A2E / #E8F5E9），未激活使用红色系（#3A2428 / #FCE4EC）
+  - 增加已启用宿主数量显示：`DAuxiliary 正在为 N 个已启用宿主提供服务`
+  - 提示文案更加友好：未激活时提示检查 LSPosed/KernelSU 配置
+
+- **Telegram 授权页重构**：
+  - 标题改为"Telegram 功能授权"，更准确描述功能范围
+  - 新增说明卡片：使用 `surfaceContainerHigh` 背景色，包含 Info 图标+标题+说明文案
+  - 说明文案："填入授权码后，DAuxiliary 将兑换为模块凭据，用于 Telegram 自动签到等功能"
+  - 授权接口标签改为"授权接口（可选）"，明确可选性
+  - 成功/失败消息使用主题色/错误色区分，字号 14sp，Medium 字重
+  - 失败消息更详细："授权失败，请检查授权码"
+
+- **注入功能页全面重做**（已在上一轮完成）：
+  - 按类别分组展示功能（HOME/CHAT/PRIVACY/BEAUTIFY/DEBUG）
+  - 每项功能显示图标（Home/Messages/Lock/Tune/Info）+ 标题 + 说明 + 开关
+  - 空状态处理：无功能时显示"暂无功能 · 该宿主应用的功能正在开发中"
+  - 开关状态正确同步 remotePreferences，修复开关失效问题
+
+- **注入设置页底栏修复**（已在上一轮完成）：
+  - 移除 `Scaffold`，改为 `Box` 布局避免 insets 双重叠加
+  - 底栏使用动态 insets：有导航栏时 `8.dp + navBarBottomPadding`，无导航栏时 `12.dp`
+  - 功能页注入导航栏高度 `PaddingValues(bottom = 76.dp)`，避免内容被底栏遮挡
+  - 底栏图标统一使用 `extended` 包：Home/Layers/Settings
+
 ### 本次回归修复
 
 - 修复 admin 页面误用默认 Miuix `FloatingNavigationBar` 的回归，恢复管理端的 iOS-like 液态玻璃悬浮底栏、拖拽选中动画和模糊背景效果。

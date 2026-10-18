@@ -18,6 +18,9 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -322,7 +325,14 @@ internal fun IosLiquidGlassNavigationBar(
 
     val combinedBackdrop = backdrop?.let { rememberCombinedBackdrop(it, tabsBackdrop) }
 
-    val bottomPaddingValue = 12.dp
+    // 动态底部间距：导航栏高度 + 8dp 悬浮留白
+    val navBarBottomPadding = WindowInsets.navigationBars.only(WindowInsetsSides.Bottom)
+        .asPaddingValues().calculateBottomPadding()
+    val bottomPaddingValue = if (navBarBottomPadding != 0.dp) {
+        8.dp + navBarBottomPadding
+    } else {
+        12.dp // 无导航栏时的默认值
+    }
 
     val tabsContent: @Composable RowScope.() -> Unit = {
         val tabScale = LocalIosTabScale.current
@@ -381,7 +391,7 @@ internal fun IosLiquidGlassNavigationBar(
     Column(modifier = modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier
-                .padding(bottom = bottomPaddingValue, start = 16.dp, end = 16.dp)
+                .padding(bottom = bottomPaddingValue, start = 12.dp, end = 12.dp)
                 .fillMaxWidth(),
             contentAlignment = Alignment.CenterStart,
         ) {

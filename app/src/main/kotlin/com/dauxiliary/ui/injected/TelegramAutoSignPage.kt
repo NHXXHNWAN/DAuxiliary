@@ -1,11 +1,12 @@
 package com.dauxiliary.ui.injected
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -13,18 +14,27 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.core.telegram.TelegramAuthorization
 import com.dauxiliary.core.telegram.TelegramPrefs
 import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Info
 import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 internal fun TelegramAuthorizationSheet() {
@@ -43,36 +53,76 @@ internal fun TelegramAuthorizationSheet() {
 
     OverlayBottomSheet(
         show = visible,
-        title = "Telegram 授权",
+        title = "Telegram 功能授权",
         onDismissRequest = { if (!busy) visible = false },
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            BasicTextField(
+            // 说明文案
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.defaultColors(
+                    color = MiuixTheme.colorScheme.surfaceContainerHigh,
+                ),
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Icon(
+                            imageVector = MiuixIcons.Info,
+                            contentDescription = null,
+                            tint = MiuixTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Text(
+                            text = "首次使用需要授权",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MiuixTheme.colorScheme.onSurface,
+                        )
+                    }
+                    Text(
+                        text = "填入授权码后，DAuxiliary 将兑换为模块凭据，用于 Telegram 自动签到等功能。",
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                }
+            }
+
+            TextField(
                 value = code,
                 onValueChange = { code = it.filter(Char::isLetterOrDigit).uppercase().take(64) },
-                modifier = Modifier.fillMaxWidth().padding(12.dp),
-                decorationBox = { inner ->
-                    Box {
-                        if (code.isBlank()) Text("授权码")
-                        inner()
-                    }
-                },
+                modifier = Modifier.fillMaxWidth(),
+                label = "授权码",
+                enabled = !busy,
             )
-            BasicTextField(
+            TextField(
                 value = endpoint,
                 onValueChange = { endpoint = it },
-                modifier = Modifier.fillMaxWidth().padding(12.dp),
-                decorationBox = { inner ->
-                    Box {
-                        if (endpoint.isBlank()) Text("授权接口")
-                        inner()
-                    }
-                },
+                modifier = Modifier.fillMaxWidth(),
+                label = "授权接口（可选）",
+                enabled = !busy,
             )
-            if (message.isNotBlank()) Text(message)
+            if (message.isNotBlank()) {
+                Text(
+                    text = message,
+                    color = if (message.contains("失败")) 
+                        MiuixTheme.colorScheme.error 
+                    else 
+                        MiuixTheme.colorScheme.primary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
+            }
             Button(
                 onClick = {
                     if (code.isBlank() || endpoint.isBlank()) {
@@ -86,7 +136,7 @@ internal fun TelegramAuthorizationSheet() {
                         val ok = TelegramAuthorization.redeemCode(context, code)
                         prefs.setAuthorized(ok)
                         ConfigStore.setTelegramAuthorized(context, ok)
-                        message = if (ok) "授权成功" else "授权失败"
+                        message = if (ok) "授权成功" else "授权失败，请检查授权码"
                         busy = false
                         if (ok) visible = false
                     }

@@ -31,7 +31,7 @@ object ConfigStore {
     )
 
     @Volatile
-    private var remotePreferences: android.content.SharedPreferences? = null
+    internal var remotePreferences: android.content.SharedPreferences? = null
 
     fun defaultEnabledApplications(): Set<String> = DEFAULT_ENABLED_APPLICATIONS
 
