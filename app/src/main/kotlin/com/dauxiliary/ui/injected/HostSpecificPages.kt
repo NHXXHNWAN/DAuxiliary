@@ -1,11 +1,18 @@
 package com.dauxiliary.ui.injected
 
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.dauxiliary.BuildConfig
+import com.dauxiliary.core.config.ConfigStore
 import com.dauxiliary.core.feature.FeatureDefinition
 import com.dauxiliary.core.feature.FeatureRegistry
 import com.dauxiliary.core.registry.AppTarget
@@ -14,16 +21,7 @@ import top.yukonga.miuix.kmp.basic.SmallTitle
 
 @Composable
 internal fun HostOverviewPage(host: AppTarget) {
-    val enabled = FeatureRegistry.enabledCount(host)
-    InjectedGroupedPage(title = "${host.displayName}设置") {
-        item { SmallTitle(text = host.displayName) }
-        item {
-            InjectedGroupCard {
-                BasicComponent(title = "DAuxiliary", summary = "${host.displayName}专属功能")
-                BasicComponent(title = "已启用功能", summary = "$enabled 项（常驻启用）")
-            }
-        }
-        item { SmallTitle(text = "模块") }
+    InjectedGroupedPage(title = "首页") {
         item {
             InjectedGroupCard {
                 BasicComponent(title = "版本", summary = BuildConfig.VERSION_NAME)
@@ -34,27 +32,38 @@ internal fun HostOverviewPage(host: AppTarget) {
 
 @Composable
 internal fun HostFeaturePage(host: AppTarget) {
-    InjectedGroupedPage(title = "${host.displayName}功能") {
-        FeatureRegistry.categoriesFor(host).forEach { category ->
-            val features = FeatureRegistry.featuresFor(host)
-                .filter { it.implemented && it.category == category }
-            if (features.isNotEmpty()) {
-                item { SmallTitle(text = category.title) }
-                item {
-                    InjectedGroupCard {
-                        features.forEach { feature -> HostFeatureItem(feature) }
-                    }
-                }
+    val context = LocalContext.current
+    InjectedGroupedPage(title = "功能") {
+        item {
+            InjectedGroupCard {
+                FeatureRegistry.featuresFor(host)
+                    .filter { it.implemented }
+                    .forEach { feature -> HostFeatureItem(context, host, feature) }
             }
         }
     }
 }
 
 @Composable
-private fun HostFeatureItem(feature: FeatureDefinition) {
+private fun HostFeatureItem(
+    context: android.content.Context,
+    host: AppTarget,
+    feature: FeatureDefinition,
+) {
+    var enabled by remember(host, feature.id) {
+        mutableStateOf(ConfigStore.enabledFeatureIds(context, host).contains(feature.id))
+    }
     BasicComponent(
         title = feature.title,
-        summary = "${feature.summary} · 常驻启用",
+        endActions = {
+            top.yukonga.miuix.kmp.basic.Switch(
+                checked = enabled,
+                onCheckedChange = {
+                    enabled = it
+                    ConfigStore.setFeatureEnabled(context, host, feature.id, it)
+                },
+            )
+        },
     )
 }
 

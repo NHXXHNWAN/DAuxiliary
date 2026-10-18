@@ -1,13 +1,14 @@
 package com.dauxiliary.ui.injected
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -16,134 +17,84 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.dauxiliary.core.config.ConfigStore
-import com.dauxiliary.core.telegram.AccountIdentityResolver
 import com.dauxiliary.core.telegram.TelegramAuthorization
 import com.dauxiliary.core.telegram.TelegramPrefs
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.BasicComponent
-import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
-
-/** Telegram-only page. /code is self-service; /auth remains Bot-admin-only. */
-private fun formatRetryAt(atMillis: Long): String {
-    val remaining = (atMillis - System.currentTimeMillis()).coerceAtLeast(0L)
-    val minutes = (remaining + 59_999L) / 60_000L
-    return if (minutes < 60L) "约 ${minutes} 分钟" else "约 ${minutes / 60L} 小时"
-}
+import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 
 @Composable
-internal fun TelegramAutoSignPage() {
+internal fun TelegramAuthorizationSheet() {
     val context = LocalContext.current
     val prefs = remember(context) { TelegramPrefs(context) }
     val scope = rememberCoroutineScope()
+    var visible by remember { mutableStateOf(!prefs.authorized()) }
     var endpoint by remember { mutableStateOf(prefs.authEndpoint()) }
-    var authCode by remember { mutableStateOf("") }
-    var authorized by remember { mutableStateOf(prefs.authorized()) }
-    var checking by remember { mutableStateOf(false) }
-    var statusText by remember { mutableStateOf("") }
-    var refreshTick by remember { mutableIntStateOf(0) }
-    LaunchedEffect(context) {
-        while (true) {
-            delay(5_000L)
-            refreshTick++
-        }
-    }
-    val account = remember(context, refreshTick) {
-        AccountIdentityResolver.resolve(context.classLoader, context.packageName)
-    }
-    val targets = remember(context, account, refreshTick) { prefs.targets(account).toList().sorted() }
+    var code by remember { mutableStateOf(prefs.authCode()) }
+    var busy by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf("") }
 
-    InjectedGroupedPage(title = "Telegram 授权与签到") {
-        item { SmallTitle(text = "授权状态") }
-        item {
-            InjectedGroupCard {
-                BasicComponent(title = "授权接口地址")
-                BasicTextField(
-                    value = endpoint,
-                    onValueChange = { endpoint = it },
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    decorationBox = { inner -> Box { if (endpoint.isEmpty()) Text("https://your-worker.example/auth/verify"); inner() } },
-                )
-                BasicComponent(title = "Telegram 模块授权码")
-                BasicTextField(
-                    value = authCode,
-                    onValueChange = { authCode = it.filter(Char::isLetterOrDigit).uppercase().take(64) },
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    decorationBox = { inner -> Box { if (authCode.isEmpty()) Text("在 Bot 私聊发送 /code 获取"); inner() } },
-                )
-                BasicComponent(
-                    title = if (authorized) "已授权" else "未授权",
-                    summary = if (authorized) {
-                        "Telegram 功能 Hook 将正常加载。已绑定 ID：${prefs.telegramUserId()}"
-                    } else {
-                        "未授权时仅保留入口，Telegram 功能 Hook 不会加载。"
-                    },
-                )
-                BasicComponent(title = "授权接口", summary = endpoint.ifBlank { "未配置" })
-                BasicComponent(
-                    title = if (checking) "正在兑换…" else "兑换授权码",
-                    summary = statusText.ifBlank { "在 Bot 私聊发送 /code，自助获取绑定本人 Telegram 的授权码。" },
-                    onClick = {
-                        prefs.setAuthEndpoint(endpoint)
-                        checking = true
-                        statusText = "正在连接授权服务…"
-                        scope.launch {
-                            authorized = TelegramAuthorization.redeemCode(context, authCode)
-                            statusText = if (authorized) {
-                                "授权成功，已绑定 Telegram ID ${prefs.telegramUserId()}。"
-                            } else {
-                                "兑换失败：授权码无效、已过期/已使用，或服务暂不可用。"
-                            }
-                            prefs.setAuthorized(authorized)
-                            ConfigStore.setTelegramAuthorized(context, authorized)
-                            checking = false
-                        }
-                    },
-                )
-                if (authorized) {
-                    BasicComponent(
-                        title = "重新校验授权",
-                        summary = "服务端记录是最终状态；撤销后这里会显示未授权。",
-                        onClick = {
-                            checking = true
-                            scope.launch {
-                                authorized = TelegramAuthorization.verify(context)
-                                prefs.setAuthorized(authorized)
-                                ConfigStore.setTelegramAuthorized(context, authorized)
-                                statusText = if (authorized) "远程校验通过。" else "远程校验失败或授权已撤销。"
-                                checking = false
-                            }
-                        },
-                    )
-                }
-            }
-        }
-        item { SmallTitle(text = "自动签到") }
-        item {
-            InjectedGroupCard {
-                BasicComponent(title = "自动签到接入", summary = if (authorized) "授权通过；会学习并发送明确的签到按钮回调。未知或无法适配的接口会安全停止。" else "需要 Telegram 模块授权后才会运行。")
-                if (targets.isEmpty()) BasicComponent(title = "暂无目标", summary = "学习签到目标后会显示在这里。")
-                targets.forEach { id ->
-                    val summary = when {
-                        prefs.signedToday(id, account) -> "今日已签到"
-                        prefs.inFlight(id, account) -> "正在发送签到请求"
-                        prefs.pendingToday(id, account) -> "待确认：未能判定签到结果"
-                        prefs.retryAt(id, account) > System.currentTimeMillis() -> "退避中，稍后自动重试（${formatRetryAt(prefs.retryAt(id, account))}）"
-                        prefs.learnedButton(account, id) != null -> "已学习按钮，等待签到"
-                        else -> "等待学习签到按钮"
+    LaunchedEffect(Unit) {
+        if (prefs.authorized()) visible = false
+    }
+
+    OverlayBottomSheet(
+        show = visible,
+        title = "Telegram 授权",
+        onDismissRequest = { if (!busy) visible = false },
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            BasicTextField(
+                value = code,
+                onValueChange = { code = it.filter(Char::isLetterOrDigit).uppercase().take(64) },
+                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                decorationBox = { inner ->
+                    Box {
+                        if (code.isBlank()) Text("授权码")
+                        inner()
                     }
-                    BasicComponent(title = id, summary = summary)
-                }
-            }
-        }
-        item { SmallTitle(text = "使用说明") }
-        item {
-            InjectedGroupCard {
-                BasicComponent(title = "获取授权码", summary = "在 Telegram Bot 私聊发送 /code。同一账号已有未兑换授权码时会返回原码；已授权后不会再次发码。")
-                BasicComponent(title = "一次性绑定", summary = "授权码完全随机、10 分钟过期、只能兑换一次，成功后绑定发码账号的 Telegram ID。")
-                BasicComponent(title = "与 Bot 管理员授权分离", summary = "/auth 和 /revoke 只管理 Bot 管理员权限，不会授予或撤销模块授权。")
-            }
+                },
+            )
+            BasicTextField(
+                value = endpoint,
+                onValueChange = { endpoint = it },
+                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                decorationBox = { inner ->
+                    Box {
+                        if (endpoint.isBlank()) Text("授权接口")
+                        inner()
+                    }
+                },
+            )
+            if (message.isNotBlank()) Text(message)
+            Button(
+                onClick = {
+                    if (code.isBlank() || endpoint.isBlank()) {
+                        message = "请填写完整"
+                        return@Button
+                    }
+                    busy = true
+                    scope.launch {
+                        prefs.setAuthEndpoint(endpoint)
+                        prefs.setAuthCode(code)
+                        val ok = TelegramAuthorization.redeemCode(context, code)
+                        prefs.setAuthorized(ok)
+                        ConfigStore.setTelegramAuthorized(context, ok)
+                        message = if (ok) "授权成功" else "授权失败"
+                        busy = false
+                        if (ok) visible = false
+                    }
+                },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColorsPrimary(),
+            ) { Text(if (busy) "验证中" else "确认授权") }
         }
     }
 }

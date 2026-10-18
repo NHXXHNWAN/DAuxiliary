@@ -7,6 +7,13 @@
 - 修复 admin 页面误用默认 Miuix `FloatingNavigationBar` 的回归，恢复管理端的 iOS-like 液态玻璃悬浮底栏、拖拽选中动画和模糊背景效果。
 - 修复 NagramXF 点击 DAuxiliary 设置入口后的崩溃：注入层级的 `FrameLayout` 现在同时绑定 `ViewTreeLifecycleOwner` 和 `ViewTreeSavedStateRegistryOwner`，解决 NagramXF 在测量阶段从父容器查找 owner 时抛出的 `ViewTreeLifecycleOwner not found`。
 - 使用 NagramXF 崩溃日志完成针对性验证；日志根因位于注入 `FrameLayout` 的 ViewTree owner 缺失，而不是设置入口反射或 Compose 内容路由错误。
+### 本轮设置页与底栏修复
+
+- 移除 app 与 admin 液态玻璃底栏在缺少导航栏 inset 时的固定 `36.dp` 底部占位，避免底栏下方空白区域遮挡注入页面和 admin 页面。
+- 修复 NagramXF 环境中通过模块包名读取图标导致的 `PackageManager.NameNotFoundException`，入口图标改为直接读取宿主应用图标；配置读取增加模块包不可解析时的安全回退。
+- Telegram 注入设置页收敛为三个底栏页面：首页仅显示版本信息并在未授权时弹出授权 BottomSheet，功能页仅保留功能名称与开关，设置页暂为空白。
+- 删除设置页中与当前结构无关的说明文案、签到状态罗列和分类标题；功能开关直接写入对应宿主配置。
+- 按 Miuix `0.9.4-rc01` 的实际 API 修正 `BasicComponent.endActions` 与 `MiuixIcons.Settings` 的调用。
 
 ### REA Android 逆向分析链路恢复
 - 引擎 SHA-256 为 `6e5eacf500b64292bfb73c49797c1958f6ee44646e43e868039ae7feb573ff75`，与 GitHub Release v0.7.1 官方校验值一致。

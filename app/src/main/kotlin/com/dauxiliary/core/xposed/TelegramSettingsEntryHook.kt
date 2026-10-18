@@ -390,10 +390,7 @@ internal object TelegramSettingsEntryHook {
                 }
                 scaleType = ImageView.ScaleType.CENTER_INSIDE
                 imageTintList = null
-                setImageDrawable(runCatching {
-                    activity.createPackageContext("com.dauxiliary", Context.CONTEXT_IGNORE_SECURITY)
-                        .packageManager.getApplicationIcon("com.dauxiliary")
-                }.getOrNull())
+                setImageDrawable(activity.applicationInfo.loadIcon(activity.packageManager))
             })
             addView(TextView(activity).apply {
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)

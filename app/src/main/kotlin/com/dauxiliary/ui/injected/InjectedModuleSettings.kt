@@ -21,13 +21,14 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Check
+import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.icon.basic.Sidebar
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-/** Minimal host-specific settings surface. It contains no global app pages. */
+
 @Composable
 fun InjectedModuleSettings(host: AppTarget) {
     val scope = rememberCoroutineScope()
-    val pageCount = if (host == AppTarget.TELEGRAM) 3 else 2
+    val pageCount = 3
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { pageCount })
     val surface = MiuixTheme.colorScheme.surface
     val backdrop = rememberLayerBackdrop {
@@ -35,11 +36,11 @@ fun InjectedModuleSettings(host: AppTarget) {
         drawContent()
     }
     var selectedPage by remember { mutableIntStateOf(0) }
-    val items = remember(host) {
+    val items = remember {
         listOf(
-            NavigationItem("概览", MiuixIcons.Basic.Check),
+            NavigationItem("首页", MiuixIcons.Basic.Check),
             NavigationItem("功能", MiuixIcons.Basic.Sidebar),
-            *(if (host == AppTarget.TELEGRAM) listOf(NavigationItem("签到", MiuixIcons.Basic.Check)) else emptyList()).toTypedArray(),
+            NavigationItem("设置", MiuixIcons.Settings),
         )
     }
 
@@ -67,12 +68,18 @@ fun InjectedModuleSettings(host: AppTarget) {
                     userScrollEnabled = true,
                 ) { page ->
                     when (page) {
-                        0 -> HostOverviewPage(host)
+                        0 -> TelegramHomePage()
                         1 -> HostFeaturePage(host)
-                        2 -> TelegramAutoSignPage()
+                        2 -> Unit
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun TelegramHomePage() {
+    TelegramAuthorizationSheet()
+    HostOverviewPage(AppTarget.TELEGRAM)
 }

@@ -81,12 +81,19 @@ object ConfigStore {
         prefs(context).edit().putStringSet(featureKey(host), current).apply()
     }
 
-    fun prefs(context: Context) =
+    fun prefs(context: Context): android.content.SharedPreferences =
         if (context.packageName == MODULE_PACKAGE) {
             context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
         } else {
-            context.createPackageContext(MODULE_PACKAGE, Context.CONTEXT_IGNORE_SECURITY)
-                .getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
+            runCatching {
+                context.createPackageContext(MODULE_PACKAGE, Context.CONTEXT_IGNORE_SECURITY)
+                    .getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
+            }.getOrElse {
+                // Hooked hosts may not be able to resolve the module package. Remote
+                // preferences remain the source of truth; this fallback prevents a
+                // settings-entry click from crashing the host process.
+                context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
+            }
         }
 
     /** Host process reports through the module-owned provider; no local flag is fabricated. */
